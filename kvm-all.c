@@ -299,6 +299,14 @@ static int kvm_get_vcpu(KVMState *s, unsigned long vcpu_id)
     return kvm_vm_ioctl(s, KVM_CREATE_VCPU, (void *)vcpu_id);
 }
 
+/*
+ * qemu_init_vcpu()
+ *  qemu_kvm_start_vcpu()
+ *   ...
+ *    qemu_kvm_cpu_thread_fn()
+ *     kvm_init_vcpu()
+ *  
+ */
 int kvm_init_vcpu(CPUState *cpu)
 {
     KVMState *s = kvm_state;
@@ -1021,6 +1029,13 @@ static void clear_gsi(KVMState *s, unsigned int gsi)
     clear_bit(gsi, s->used_gsi_bitmap);
 }
 
+/*
+ * main() [vl.c]
+ *  configure_accelerator()
+ *   kvm_init()
+ *    kvm_irqchip_create()
+ *     kvm_init_irq_routing()
+ */
 void kvm_init_irq_routing(KVMState *s)
 {
     int gsi_count, i;
@@ -1487,6 +1502,12 @@ void kvm_irqchip_set_qemuirq_gsi(KVMState *s, qemu_irq irq, int gsi)
     g_hash_table_insert(s->gsimap, irq, GINT_TO_POINTER(gsi));
 }
 
+/*
+ * main() [vl.c]
+ *  configure_accelerator()
+ *   kvm_init()
+ *    kvm_irqchip_create()
+ */
 static void kvm_irqchip_create(MachineState *machine, KVMState *s)
 {
     int ret;
@@ -1559,6 +1580,11 @@ bool kvm_vcpu_id_is_valid(int vcpu_id)
     return vcpu_id >= 0 && vcpu_id < kvm_max_vcpu_id(s);
 }
 
+/*
+ * main() [vl.c]
+ *  configure_accelerator()
+ *   kvm_init()
+ */
 static int kvm_init(MachineState *ms)
 {
     MachineClass *mc = MACHINE_GET_CLASS(ms);
@@ -1580,6 +1606,7 @@ static int kvm_init(MachineState *ms)
     int type = 0;
     const char *kvm_type;
 
+    //KVMState
     s = KVM_STATE(ms->accelerator);
 
     /*
@@ -1597,6 +1624,7 @@ static int kvm_init(MachineState *ms)
 #endif
     QLIST_INIT(&s->kvm_parked_vcpus);
     s->vmfd = -1;
+	//打开kvm字符设备了
     s->fd = qemu_open("/dev/kvm", O_RDWR);
     if (s->fd == -1) {
         fprintf(stderr, "Could not access KVM kernel module: %m\n");
@@ -1604,6 +1632,7 @@ static int kvm_init(MachineState *ms)
         goto err;
     }
 
+	//检查版本
     ret = kvm_ioctl(s, KVM_GET_API_VERSION, 0);
     if (ret < KVM_API_VERSION) {
         if (ret >= 0) {
@@ -1619,6 +1648,7 @@ static int kvm_init(MachineState *ms)
         goto err;
     }
 
+    //内存可以有的slots总
     s->nr_slots = kvm_check_extension(s, KVM_CAP_NR_MEMSLOTS);
 
     /* If unspecified, use the default value */
@@ -1656,7 +1686,7 @@ static int kvm_init(MachineState *ms)
         goto err;
     }
 
-    do {
+    do { //创建一个VM出来了
         ret = kvm_ioctl(s, KVM_CREATE_VM, type);
     } while (ret == -EINTR);
 
@@ -1680,6 +1710,7 @@ static int kvm_init(MachineState *ms)
         goto err;
     }
 
+    //保存好vm的fd
     s->vmfd = ret;
     missing_cap = kvm_check_extension_list(s, kvm_required_capabilites);
     if (!missing_cap) {
@@ -1696,12 +1727,14 @@ static int kvm_init(MachineState *ms)
     s->coalesced_mmio = kvm_check_extension(s, KVM_CAP_COALESCED_MMIO);
 
     s->broken_set_mem_region = 1;
+	//必然返回1
     ret = kvm_check_extension(s, KVM_CAP_JOIN_MEMORY_REGIONS_WORKS);
     if (ret > 0) {
         s->broken_set_mem_region = 0;
     }
 
 #ifdef KVM_CAP_VCPU_EVENTS
+    //如果有定义，就返回1了
     s->vcpu_events = kvm_check_extension(s, KVM_CAP_VCPU_EVENTS);
 #endif
 
@@ -1713,24 +1746,30 @@ static int kvm_init(MachineState *ms)
 #endif
 
 #ifdef KVM_CAP_IRQ_ROUTING
+    //返回1
     kvm_direct_msi_allowed = (kvm_check_extension(s, KVM_CAP_SIGNAL_MSI) > 0);
 #endif
 
     s->intx_set_mask = kvm_check_extension(s, KVM_CAP_PCI_2_3);
 
     s->irq_set_ioctl = KVM_IRQ_LINE;
+	//返回1
     if (kvm_check_extension(s, KVM_CAP_IRQ_INJECT_STATUS)) {
         s->irq_set_ioctl = KVM_IRQ_LINE_STATUS;
     }
 
+//有定义
 #ifdef KVM_CAP_READONLY_MEM
+    //返回1
     kvm_readonly_mem_allowed =
         (kvm_check_extension(s, KVM_CAP_READONLY_MEM) > 0);
 #endif
 
+    //返回1
     kvm_eventfds_allowed =
         (kvm_check_extension(s, KVM_CAP_IOEVENTFD) > 0);
 
+    //返回1
     kvm_irqfds_allowed =
         (kvm_check_extension(s, KVM_CAP_IRQFD) > 0);
 
@@ -1743,11 +1782,13 @@ static int kvm_init(MachineState *ms)
     kvm_ioeventfd_any_length_allowed =
         (kvm_check_extension(s, KVM_CAP_IOEVENTFD_ANY_LENGTH) > 0);
 
+    //x86平台相关的设置
     ret = kvm_arch_init(ms, s);
     if (ret < 0) {
         goto err;
     }
 
+    //中断表设置
     if (machine_kernel_irqchip_allowed(ms)) {
         kvm_irqchip_create(ms, s);
     }
@@ -1899,6 +1940,14 @@ void kvm_cpu_synchronize_post_init(CPUState *cpu)
     run_on_cpu(cpu, do_kvm_cpu_synchronize_post_init, RUN_ON_CPU_NULL);
 }
 
+/*
+ * qemu_init_vcpu()
+ *  qemu_kvm_start_vcpu()
+ *   ...
+ *    qemu_kvm_cpu_thread_fn() vCPU线程
+ *     kvm_cpu_exec()
+ * 
+ */
 int kvm_cpu_exec(CPUState *cpu)
 {
     struct kvm_run *run = cpu->kvm_run;
@@ -1932,8 +1981,10 @@ int kvm_cpu_exec(CPUState *cpu)
             qemu_cpu_kick_self();
         }
 
+        //在内核的KVM进入guest os了
         run_ret = kvm_vcpu_ioctl(cpu, KVM_RUN, 0);
 
+        //发送VM EXIT退出到这里
         attrs = kvm_arch_post_run(cpu, run);
 
         if (run_ret < 0) {
@@ -2489,5 +2540,5 @@ static void kvm_type_init(void)
 {
     type_register_static(&kvm_accel_type);
 }
-
+//在main之前就运行了
 type_init(kvm_type_init);

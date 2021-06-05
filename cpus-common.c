@@ -113,6 +113,10 @@ struct qemu_work_item {
     bool free, exclusive, done;
 };
 
+/*
+ * 
+ 
+ */
 static void queue_work_on_cpu(CPUState *cpu, struct qemu_work_item *wi)
 {
     qemu_mutex_lock(&cpu->work_mutex);
@@ -136,6 +140,39 @@ static void queue_work_on_cpu(CPUState *cpu, struct qemu_work_item *wi)
  *    kvm_cpu_synchronize_post_init()
  *     run_on_cpu(func == do_kvm_cpu_synchronize_post_init)
  *      do_run_on_cpu(func== do_kvm_cpu_synchronize_post_init)
+ *
+ * kvm_apic_post_load()
+ * kvm_apic_reset()
+ *  run_on_cpu(func=kvm_apic_put)
+ *   do_run_on_cpu(func=kvm_apic_put)
+ *
+ * kvm_apic_external_nmi()
+ *  run_on_cpu(func=do_inject_external_nmi)
+ *   do_run_on_cpu(func=kvm_apic_put)
+ *
+ * cpu_x86_inject_mce()
+ *  run_on_cpu(func=do_inject_x86_mce)
+ *   do_run_on_cpu(func=kvm_apic_put)
+ *
+ * kvm_cpu_synchronize_state()
+ *  run_on_cpu(func=do_kvm_cpu_synchronize_state)
+ *   do_run_on_cpu(func=kvm_apic_put)
+ *
+ * kvm_update_guest_debug()
+ *  run_on_cpu(func=kvm_invoke_set_guest_debug)
+ *   do_run_on_cpu(func=kvm_apic_put)
+ *
+ * kvm_synchronize_all_tsc()
+ *  run_on_cpu(func=do_kvm_synchronize_tsc)
+ *   do_run_on_cpu(func=kvm_apic_put)
+ *
+ * vapic_enable_tpr_reporting()
+ *  run_on_cpu(func=vapic_do_enable_tpr_reporting)
+ *   do_run_on_cpu(func=kvm_apic_put)
+ *
+ * kvmvapic_vm_state_change()
+ *  run_on_cpu(func=do_vapic_enable) 
+ *   do_run_on_cpu(func=kvm_apic_put)
  */
 void do_run_on_cpu(CPUState *cpu, run_on_cpu_func func, run_on_cpu_data data,
                    QemuMutex *mutex)
@@ -318,6 +355,15 @@ void async_safe_run_on_cpu(CPUState *cpu, run_on_cpu_func func,
     queue_work_on_cpu(cpu, wi);
 }
 
+/*
+ * qemu_init_vcpu()
+ *  qemu_kvm_start_vcpu()
+ *   ...
+ *    qemu_kvm_cpu_thread_fn()
+ *     qemu_kvm_wait_io_event()
+ *      qemu_wait_io_event_common()
+ *       process_queued_cpu_work()
+ */
 void process_queued_cpu_work(CPUState *cpu)
 {
     struct qemu_work_item *wi;
@@ -328,6 +374,7 @@ void process_queued_cpu_work(CPUState *cpu)
 
     qemu_mutex_lock(&cpu->work_mutex);
     while (cpu->queued_work_first != NULL) {
+		//弹出来
         wi = cpu->queued_work_first;
         cpu->queued_work_first = wi->next;
         if (!cpu->queued_work_first) {
@@ -343,10 +390,12 @@ void process_queued_cpu_work(CPUState *cpu)
              */
             qemu_mutex_unlock_iothread();
             start_exclusive();
+		    // 走起
             wi->func(cpu, wi->data);
             end_exclusive();
             qemu_mutex_lock_iothread();
         } else {
+			// 走起
             wi->func(cpu, wi->data);
         }
         qemu_mutex_lock(&cpu->work_mutex);

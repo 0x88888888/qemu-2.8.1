@@ -929,6 +929,31 @@ void qemu_init_cpu_loop(void)
  *   cpu_synchronize_post_init()
  *    kvm_cpu_synchronize_post_init()
  *     run_on_cpu(func == do_kvm_cpu_synchronize_post_init)
+ *
+ * kvm_apic_post_load()
+ * kvm_apic_reset()
+ *  run_on_cpu(func=kvm_apic_put)
+ *
+ * kvm_apic_external_nmi()
+ *  run_on_cpu(func=do_inject_external_nmi)
+ *
+ * cpu_x86_inject_mce()
+ *  run_on_cpu(func=do_inject_x86_mce)
+ *
+ * kvm_cpu_synchronize_state()
+ *  run_on_cpu(func=do_kvm_cpu_synchronize_state)
+ *
+ * kvm_update_guest_debug()
+ *  run_on_cpu(func=kvm_invoke_set_guest_debug)
+ *
+ * kvm_synchronize_all_tsc()
+ *  run_on_cpu(func=do_kvm_synchronize_tsc)
+ *
+ * vapic_enable_tpr_reporting()
+ *  run_on_cpu(func=vapic_do_enable_tpr_reporting)
+ *
+ * kvmvapic_vm_state_change()
+ *  run_on_cpu(func=do_vapic_enable)
  */
 void run_on_cpu(CPUState *cpu, run_on_cpu_func func, run_on_cpu_data data)
 {
@@ -947,6 +972,14 @@ static void qemu_tcg_destroy_vcpu(CPUState *cpu)
 {
 }
 
+/*
+ * qemu_init_vcpu()
+ *  qemu_kvm_start_vcpu()
+ *   ...
+ *    qemu_kvm_cpu_thread_fn()
+ *     qemu_kvm_wait_io_event()
+ *      qemu_wait_io_event_common()
+ */
 static void qemu_wait_io_event_common(CPUState *cpu)
 {
     if (cpu->stop) {
@@ -973,6 +1006,13 @@ static void qemu_tcg_wait_io_event(CPUState *cpu)
     }
 }
 
+/*
+ * qemu_init_vcpu()
+ *  qemu_kvm_start_vcpu()
+ *   ...
+ *    qemu_kvm_cpu_thread_fn()
+ *     qemu_kvm_wait_io_event()
+ */
 static void qemu_kvm_wait_io_event(CPUState *cpu)
 {
     while (cpu_thread_is_idle(cpu)) {
@@ -983,6 +1023,14 @@ static void qemu_kvm_wait_io_event(CPUState *cpu)
     qemu_wait_io_event_common(cpu);
 }
 
+/*
+ * qemu_init_vcpu()
+ *  qemu_kvm_start_vcpu()
+ *   ...
+ *    qemu_kvm_cpu_thread_fn()
+ *
+ * vCPU线程
+ */
 static void *qemu_kvm_cpu_thread_fn(void *arg)
 {
     CPUState *cpu = arg;
@@ -996,6 +1044,7 @@ static void *qemu_kvm_cpu_thread_fn(void *arg)
     cpu->can_do_io = 1;
     current_cpu = cpu;
 
+    //初始化vCPU信息
     r = kvm_init_vcpu(cpu);
     if (r < 0) {
         fprintf(stderr, "kvm_init_vcpu failed: %s\n", strerror(-r));
@@ -1008,6 +1057,7 @@ static void *qemu_kvm_cpu_thread_fn(void *arg)
     cpu->created = true;
     qemu_cond_signal(&qemu_cpu_cond);
 
+    //走起
     do {
         if (cpu_can_run(cpu)) {
             r = kvm_cpu_exec(cpu);
@@ -1015,9 +1065,11 @@ static void *qemu_kvm_cpu_thread_fn(void *arg)
                 cpu_handle_guest_debug(cpu);
             }
         }
+		//处理事件了
         qemu_kvm_wait_io_event(cpu);
     } while (!cpu->unplug || cpu_can_run(cpu));
 
+    //走到这里，这个vCPU就算是玩球了
     qemu_kvm_destroy_vcpu(cpu);
     cpu->created = false;
     qemu_cond_signal(&qemu_cpu_cond);
@@ -1433,6 +1485,10 @@ static void qemu_tcg_init_vcpu(CPUState *cpu)
     }
 }
 
+/*
+ * qemu_init_vcpu()
+ *  qemu_kvm_start_vcpu()
+ */
 static void qemu_kvm_start_vcpu(CPUState *cpu)
 {
     char thread_name[VCPU_THREAD_NAME_SIZE];
@@ -1442,6 +1498,7 @@ static void qemu_kvm_start_vcpu(CPUState *cpu)
     qemu_cond_init(cpu->halt_cond);
     snprintf(thread_name, VCPU_THREAD_NAME_SIZE, "CPU %d/KVM",
              cpu->cpu_index);
+	//创建vCPU
     qemu_thread_create(cpu->thread, thread_name, qemu_kvm_cpu_thread_fn,
                        cpu, QEMU_THREAD_JOINABLE);
     while (!cpu->created) {
@@ -1481,7 +1538,7 @@ void qemu_init_vcpu(CPUState *cpu)
         cpu_address_space_init(cpu, as, 0);
     }
 
-    if (kvm_enabled()) {
+    if (kvm_enabled()) { //走这里
         qemu_kvm_start_vcpu(cpu);
     } else if (tcg_enabled()) {
         qemu_tcg_init_vcpu(cpu);

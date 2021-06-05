@@ -59,6 +59,11 @@ static AccelClass *accel_find(const char *opt_name)
     return ac;
 }
 
+/*
+ * main() [vl.c]
+ *  configure_accelerator()
+ *
+ */
 static int accel_init_machine(AccelClass *acc, MachineState *ms)
 {
     ObjectClass *oc = OBJECT_CLASS(acc);
@@ -67,6 +72,7 @@ static int accel_init_machine(AccelClass *acc, MachineState *ms)
     int ret;
     ms->accelerator = accel;
     *(acc->allowed) = true;
+	//kvm_init
     ret = acc->init_machine(ms);
     if (ret < 0) {
         ms->accelerator = NULL;
@@ -76,6 +82,12 @@ static int accel_init_machine(AccelClass *acc, MachineState *ms)
     return ret;
 }
 
+/*
+ * main() [vl.c]
+ *  configure_accelerator()
+ *
+ * 确定使用那种虚拟化方案
+ */
 void configure_accelerator(MachineState *ms)
 {
     const char *p;
@@ -96,6 +108,7 @@ void configure_accelerator(MachineState *ms)
             p++;
         }
         p = get_opt_name(buf, sizeof(buf), p, ':');
+		//查找到在kvm_accel_class_init()中初始化的kvm AccelClass对象
         acc = accel_find(buf);
         if (!acc) {
             fprintf(stderr, "\"%s\" accelerator not found.\n", buf);

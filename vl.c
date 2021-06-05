@@ -4394,6 +4394,7 @@ int main(int argc, char **argv, char **envp)
         exit(1);
     }
 
+    //确定虚拟化方案,在这个函数调用到kvm_init()创建VM了
     configure_accelerator(current_machine);
 
     if (qtest_chrdev) {

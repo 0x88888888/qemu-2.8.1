@@ -688,6 +688,14 @@ static Error *invtsc_mig_blocker;
 
 #define KVM_MAX_CPUID_ENTRIES  100
 
+/*
+ * qemu_init_vcpu()
+ *  qemu_kvm_start_vcpu()
+ *   ...
+ *    qemu_kvm_cpu_thread_fn()
+ *     kvm_init_vcpu()
+ *      kvm_arch_init_vcpu()
+ */
 int kvm_arch_init_vcpu(CPUState *cs)
 {
     struct {
@@ -1161,6 +1169,12 @@ static void register_smram_listener(Notifier *n, void *unused)
                                  &smram_address_space, 1);
 }
 
+/*
+ * main() [vl.c]
+ *  configure_accelerator()
+ *   kvm_init()
+ *    kvm_arch_init()
+ */
 int kvm_arch_init(MachineState *ms, KVMState *s)
 {
     uint64_t identity_base = 0xfffbc000;
@@ -3232,6 +3246,14 @@ bool kvm_arch_stop_on_emulation_error(CPUState *cs)
            ((env->segs[R_CS].selector  & 3) != 3);
 }
 
+/*
+ * main() [vl.c]
+ *  configure_accelerator()
+ *   kvm_init()
+ *    kvm_irqchip_create()
+ *     kvm_init_irq_routing()
+ *      kvm_arch_init_irq_routing()
+ */
 void kvm_arch_init_irq_routing(KVMState *s)
 {
     if (!kvm_check_extension(s, KVM_CAP_IRQ_ROUTING)) {
