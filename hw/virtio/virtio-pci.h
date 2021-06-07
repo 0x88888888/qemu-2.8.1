@@ -135,6 +135,7 @@ typedef struct VirtIOPCIQueue {
 } VirtIOPCIQueue;
 
 struct VirtIOPCIProxy {
+	//包含虚拟PCI设备信息
     PCIDevice pci_dev;
     MemoryRegion bar;
     VirtIOPCIRegion common;
@@ -142,10 +143,12 @@ struct VirtIOPCIProxy {
     VirtIOPCIRegion device;
     VirtIOPCIRegion notify;
     VirtIOPCIRegion notify_pio;
+	//IO内存基地址结构
     MemoryRegion modern_bar;
     MemoryRegion io_bar;
     MemoryRegion modern_cfg;
     AddressSpace modern_as;
+	
     uint32_t legacy_io_bar_idx;
     uint32_t msix_bar_idx;
     uint32_t modern_io_bar_idx;

@@ -2019,6 +2019,7 @@ typedef struct QEMUOption {
     uint32_t arch_mask;
 } QEMUOption;
 
+//qemu选项
 static const QEMUOption qemu_options[] = {
     { "h", 0, QEMU_OPTION_h, QEMU_ARCH_ALL },
 #define QEMU_OPTIONS_GENERATE_OPTIONS
@@ -3070,6 +3071,11 @@ int main(int argc, char **argv, char **envp)
     module_call_init(MODULE_INIT_QOM);
     module_call_init(MODULE_INIT_QAPI);
 
+	/*
+	 * 添加qemu所有会用到的选项到vm_config_groups中去.
+	 *
+	 * 系统中所有的选项都在qemu_options这个数组中
+	 */
     qemu_add_opts(&qemu_drive_opts);
     qemu_add_drive_opts(&qemu_legacy_drive_opts);
     qemu_add_drive_opts(&qemu_common_drive_opts);

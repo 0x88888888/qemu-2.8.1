@@ -59,16 +59,20 @@ typedef struct VirtIOBlock {
 } VirtIOBlock;
 
 typedef struct VirtIOBlockReq {
+	//队列中的散列表元素
     VirtQueueElement elem;
     int64_t sector_num;
     VirtIOBlock *dev;
     VirtQueue *vq;
+	//以下2个域与guest中定义对应
     struct virtio_blk_inhdr *in;
     struct virtio_blk_outhdr out;
     QEMUIOVector qiov;
     size_t in_len;
+	//单链表指针
     struct VirtIOBlockReq *next;
     struct VirtIOBlockReq *mr_next;
+	//统计信息
     BlockAcctCookie acct;
 } VirtIOBlockReq;
 

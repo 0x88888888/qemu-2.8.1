@@ -94,10 +94,20 @@ struct kvm_memory_region {
 
 /* for KVM_SET_USER_MEMORY_REGION */
 struct kvm_userspace_memory_region {
+    //要在哪个slot上注册内存区间
 	__u32 slot;
+	/*
+	 * flags有两个取值，KVM_MEM_LOG_DIRTY_PAGES和KVM_MEM_READONLY，
+	 * 用来指示kvm针对这段内存应该做的事情。
+	 * KVM_MEM_LOG_DIRTY_PAGES用来开启内存脏页，
+     * KVM_MEM_READONLY用来开启内存只读。
+	 */
 	__u32 flags;
+	//虚机内存区间起始物理地址
 	__u64 guest_phys_addr;
+	//虚机内存区间大小
 	__u64 memory_size; /* bytes */
+	//虚机内存区间对应的主机虚拟地址
 	__u64 userspace_addr; /* start of the userspace allocated memory */
 };
 

@@ -2758,6 +2758,22 @@ MemTxResult address_space_read_full(AddressSpace *as, hwaddr addr,
     return result;
 }
 
+/*
+ * qemu_init_vcpu()
+ *	qemu_kvm_start_vcpu()
+ *	 ...
+ *	  qemu_kvm_cpu_thread_fn() vCPU线程
+ *	   kvm_cpu_exec()
+ *      address_space_rw(as=address_space_memory)
+ *
+ * qemu_init_vcpu()
+ *  qemu_kvm_start_vcpu()
+ *   ...
+ *    qemu_kvm_cpu_thread_fn() vCPU线程
+ *     kvm_cpu_exec()
+ *      kvm_handle_io()
+ *       address_space_rw(as = address_space_io)
+ */
 MemTxResult address_space_rw(AddressSpace *as, hwaddr addr, MemTxAttrs attrs,
                              uint8_t *buf, int len, bool is_write)
 {

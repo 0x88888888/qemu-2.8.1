@@ -15,9 +15,13 @@
 
 typedef struct KVMSlot
 {
+    /* 虚机内存区间起始地址（GPA） */
     hwaddr start_addr;
+	/* 虚机内存区间长度 */
     ram_addr_t memory_size;
+	/* 虚机内存区间对应的主机虚拟地址起始内存的指针，通过该指针可以查看内存页内容 */	
     void *ram;
+	/* 在虚机所拥有的内存slot数组的索引 */
     int slot;
     int flags;
 } KVMSlot;

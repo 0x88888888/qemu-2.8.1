@@ -958,6 +958,12 @@ static void kvm_io_ioeventfd_del(MemoryListener *listener,
     }
 }
 
+ /*
+  * main() [vl.c]
+  *  configure_accelerator()
+  *   kvm_init()
+  *    kvm_memory_listener_register(as=address_space_memory)
+  */
 void kvm_memory_listener_register(KVMState *s, KVMMemoryListener *kml,
                                   AddressSpace *as, int as_id)
 {
@@ -1802,6 +1808,7 @@ static int kvm_init(MachineState *ms)
     s->memory_listener.listener.coalesced_mmio_add = kvm_coalesce_mmio_region;
     s->memory_listener.listener.coalesced_mmio_del = kvm_uncoalesce_mmio_region;
 
+    
     kvm_memory_listener_register(s, &s->memory_listener,
                                  &address_space_memory, 0);
     memory_listener_register(&kvm_io_listener,
@@ -1831,6 +1838,14 @@ void kvm_set_sigmask_len(KVMState *s, unsigned int sigmask_len)
     s->sigmask_len = sigmask_len;
 }
 
+/*
+ * qemu_init_vcpu()
+ *  qemu_kvm_start_vcpu()
+ *   ...
+ *    qemu_kvm_cpu_thread_fn() vCPU线程
+ *     kvm_cpu_exec()
+ *      kvm_handle_io()
+ */
 static void kvm_handle_io(uint16_t port, MemTxAttrs attrs, void *data, int direction,
                           int size, uint32_t count)
 {
@@ -2007,6 +2022,7 @@ int kvm_cpu_exec(CPUState *cpu)
             break;
         }
 
+        //vCPU在guest中处理不能处理的情况了，并且kernel 的kvm也不能处理了，到这里来处理
         trace_kvm_run_exit(cpu->cpu_index, run->exit_reason);
         switch (run->exit_reason) {
         case KVM_EXIT_IO:
@@ -2033,7 +2049,7 @@ int kvm_cpu_exec(CPUState *cpu)
             DPRINTF("irq_window_open\n");
             ret = EXCP_INTERRUPT;
             break;
-        case KVM_EXIT_SHUTDOWN:
+        case KVM_EXIT_SHUTDOWN://关机了
             DPRINTF("shutdown\n");
             qemu_system_reset_request();
             ret = EXCP_INTERRUPT;
@@ -2046,7 +2062,7 @@ int kvm_cpu_exec(CPUState *cpu)
         case KVM_EXIT_INTERNAL_ERROR:
             ret = kvm_handle_internal_error(cpu, run);
             break;
-        case KVM_EXIT_SYSTEM_EVENT:
+        case KVM_EXIT_SYSTEM_EVENT://一些系统事件要处理了
             switch (run->system_event.type) {
             case KVM_SYSTEM_EVENT_SHUTDOWN:
                 qemu_system_shutdown_request();

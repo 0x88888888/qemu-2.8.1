@@ -70,20 +70,28 @@ enum virtio_device_endian {
     VIRTIO_DEVICE_ENDIAN_BIG,
 };
 
+//virtio子设备信息
 struct VirtIODevice
 {
     DeviceState parent_obj;
-    const char *name;
+    //设备名，块中为virtio-blk	
+    const char *name;   
+	//设备状态
     uint8_t status;
+	//中断请求
     uint8_t isr;
+	//所选队列号
     uint16_t queue_sel;
+	//客户机特征
     uint64_t guest_features;
     uint64_t host_features;
+	//配置信息长度
     size_t config_len;
     void *config;
     uint16_t config_vector;
     uint32_t generation;
     int nvectors;
+	//虚拟队列，块设备只有一个
     VirtQueue *vq;
     uint16_t device_id;
     bool vm_running;

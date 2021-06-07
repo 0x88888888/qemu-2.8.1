@@ -3171,6 +3171,14 @@ static bool host_supports_vmx(void)
 
 #define VMX_INVALID_GUEST_STATE 0x80000021
 
+/*
+ * qemu_init_vcpu()
+ *  qemu_kvm_start_vcpu()
+ *   ...
+ *    qemu_kvm_cpu_thread_fn() vCPU线程
+ *     kvm_cpu_exec()
+ *      kvm_arch_handle_exit()
+ */
 int kvm_arch_handle_exit(CPUState *cs, struct kvm_run *run)
 {
     X86CPU *cpu = X86_CPU(cs);
