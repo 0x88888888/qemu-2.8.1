@@ -74,12 +74,20 @@ struct KVMState
     int nr_slots;
     int fd;
     int vmfd;
+	//是否支持KVM_CAP_COALESCED_MMIO
     int coalesced_mmio;
     struct kvm_coalesced_mmio_ring *coalesced_mmio_ring;
     bool coalesced_flush_in_progress;
     int broken_set_mem_region;
+	/* 
+	 * 是否支持KVM_CAP_VCPU_EVENTS
+	 */
     int vcpu_events;
+	/*
+	 * 是否支持KVM_CAP_X86_ROBUST_SINGLESTEP
+	 */
     int robust_singlestep;
+	//是否支持KVM_CAP_DEBUGREGS
     int debugregs;
 #ifdef KVM_CAP_SET_GUEST_DEBUG
     struct kvm_sw_breakpoint_head kvm_sw_breakpoints;
@@ -315,6 +323,7 @@ int kvm_init_vcpu(CPUState *cpu)
 
     DPRINTF("kvm_init_vcpu\n");
 
+    //在内核创建一个vCPU或者ring3返回以前创建的
     ret = kvm_get_vcpu(s, kvm_arch_vcpu_id(cpu));
     if (ret < 0) {
         DPRINTF("kvm_create_vcpu failed\n");
@@ -325,6 +334,7 @@ int kvm_init_vcpu(CPUState *cpu)
     cpu->kvm_state = s;
     cpu->kvm_vcpu_dirty = true;
 
+    //返回QEMU和KVM共享内存的大小
     mmap_size = kvm_ioctl(s, KVM_GET_VCPU_MMAP_SIZE, 0);
     if (mmap_size < 0) {
         ret = mmap_size;
@@ -332,6 +342,7 @@ int kvm_init_vcpu(CPUState *cpu)
         goto err;
     }
 
+    //映射共享内存空间,这个在内核中会调用到kvm_vcpu_mmap,这段VMA的pagefault处理函数为kvm_vcpu_fault
     cpu->kvm_run = mmap(NULL, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED,
                         cpu->kvm_fd, 0);
     if (cpu->kvm_run == MAP_FAILED) {
@@ -589,6 +600,10 @@ static uint32_t adjust_ioeventfd_endianness(uint32_t val, uint32_t size)
     return val;
 }
 
+/*
+ * kvm_mem_ioeventfd_add()
+ *  kvm_set_ioeventfd_mmio()
+ */
 static int kvm_set_ioeventfd_mmio(int fd, hwaddr addr, uint32_t val,
                                   bool assign, uint32_t size, bool datamatch)
 {
@@ -621,6 +636,10 @@ static int kvm_set_ioeventfd_mmio(int fd, hwaddr addr, uint32_t val,
     return 0;
 }
 
+/*
+ * kvm_io_ioeventfd_add()
+ *  kvm_set_ioeventfd_pio()
+ */
 static int kvm_set_ioeventfd_pio(int fd, uint16_t addr, uint16_t val,
                                  bool assign, uint32_t size, bool datamatch)
 {
@@ -1723,6 +1742,7 @@ static int kvm_init(MachineState *ms)
         missing_cap =
             kvm_check_extension_list(s, kvm_arch_required_capabilities);
     }
+	
     if (missing_cap) {
         ret = -EINVAL;
         fprintf(stderr, "kvm does not support %s\n%s",
@@ -1744,10 +1764,12 @@ static int kvm_init(MachineState *ms)
     s->vcpu_events = kvm_check_extension(s, KVM_CAP_VCPU_EVENTS);
 #endif
 
+    //返回1
     s->robust_singlestep =
         kvm_check_extension(s, KVM_CAP_X86_ROBUST_SINGLESTEP);
 
 #ifdef KVM_CAP_DEBUGREGS
+    //返回1
     s->debugregs = kvm_check_extension(s, KVM_CAP_DEBUGREGS);
 #endif
 
@@ -1779,12 +1801,15 @@ static int kvm_init(MachineState *ms)
     kvm_irqfds_allowed =
         (kvm_check_extension(s, KVM_CAP_IRQFD) > 0);
 
+    //返回1
     kvm_resamplefds_allowed =
         (kvm_check_extension(s, KVM_CAP_IRQFD_RESAMPLE) > 0);
 
+    //返回1
     kvm_vm_attributes_allowed =
         (kvm_check_extension(s, KVM_CAP_VM_ATTRIBUTES) > 0);
 
+    //返回1
     kvm_ioeventfd_any_length_allowed =
         (kvm_check_extension(s, KVM_CAP_IOEVENTFD_ANY_LENGTH) > 0);
 
@@ -1802,6 +1827,7 @@ static int kvm_init(MachineState *ms)
     kvm_state = s;
 
     if (kvm_eventfds_allowed) {
+		//监听函数
         s->memory_listener.listener.eventfd_add = kvm_mem_ioeventfd_add;
         s->memory_listener.listener.eventfd_del = kvm_mem_ioeventfd_del;
     }
@@ -1809,8 +1835,10 @@ static int kvm_init(MachineState *ms)
     s->memory_listener.listener.coalesced_mmio_del = kvm_uncoalesce_mmio_region;
 
     
+    //给两个地址空间添加两个监听函数
     kvm_memory_listener_register(s, &s->memory_listener,
                                  &address_space_memory, 0);
+	
     memory_listener_register(&kvm_io_listener,
                              &address_space_io);
 
@@ -1985,6 +2013,7 @@ int kvm_cpu_exec(CPUState *cpu)
             cpu->kvm_vcpu_dirty = false;
         }
 
+        //在KVM_RUN之前做一些准备工作，比如注入NMI和SMI中断
         kvm_arch_pre_run(cpu, run);
         if (cpu->exit_request) {
             DPRINTF("interrupt exit requested\n");
@@ -1999,7 +2028,7 @@ int kvm_cpu_exec(CPUState *cpu)
         //在内核的KVM进入guest os了
         run_ret = kvm_vcpu_ioctl(cpu, KVM_RUN, 0);
 
-        //发送VM EXIT退出到这里
+        //发生VM EXIT退出到这里
         attrs = kvm_arch_post_run(cpu, run);
 
         if (run_ret < 0) {
@@ -2024,6 +2053,7 @@ int kvm_cpu_exec(CPUState *cpu)
 
         //vCPU在guest中处理不能处理的情况了，并且kernel 的kvm也不能处理了，到这里来处理
         trace_kvm_run_exit(cpu->cpu_index, run->exit_reason);
+		//根据QEMU和KVM的共享内存来处理 KVM_EXIT
         switch (run->exit_reason) {
         case KVM_EXIT_IO:
             DPRINTF("handle_io\n");

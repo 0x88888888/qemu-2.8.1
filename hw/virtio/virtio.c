@@ -1254,6 +1254,11 @@ static void virtio_queue_notify_vq(VirtQueue *vq)
     }
 }
 
+/*
+ * virtio_pci_config_write()
+ *	virtio_ioport_write()
+ *   virtio_queue_notify()
+ */
 void virtio_queue_notify(VirtIODevice *vdev, int n)
 {
     VirtQueue *vq = &vdev->vq[n];

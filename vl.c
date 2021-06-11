@@ -780,6 +780,10 @@ void qemu_system_vmstop_request(RunState state)
     qemu_notify_event();
 }
 
+/*
+ * main() [vl.c]
+ *  vm_start()
+ */
 void vm_start(void)
 {
     RunState requested;
@@ -798,9 +802,12 @@ void vm_start(void)
         qapi_event_send_stop(&error_abort);
     } else {
         replay_enable_events();
+		
         cpu_enable_ticks();
         runstate_set(RUN_STATE_RUNNING);
         vm_state_notify(1, RUN_STATE_RUNNING);
+
+		//唤醒所有的vCPU线程
         resume_all_vcpus();
     }
 
@@ -3015,9 +3022,24 @@ static int global_init_func(void *opaque, QemuOpts *opts, Error **errp)
 
 /*
  * 入口,在入口函数之前已经执行了 
- * block_init(function), opts_init(function),
- * qapi_init(function), type_init(function),
+ * block_init(function),
+ *     ------bdrv_qcow_init, bdrv_qcow2_init
+ *
+ * opts_init(function),
+ *     ------acpi_register_config,vnc_register_config,
+ *     ------fsdev_register_config,smbios_register_config
+ *     ------spice_register_config
+ *
+ * qapi_init(function), 
+ *     -------qmp_init_marshal
+ *
+ * type_init(function),都会调用type_register,type_register_static这两个函数来注册
+ *     -------- type_init(x86_cpu_register_types), host_x86_cpu_type_info
+ * 
+ *
  * trace_init(function) 设置的的初始函数
+ *
+ * 选项都在qemu_options[]中
  *
  * main() [vl.c]
  */
@@ -3068,7 +3090,9 @@ int main(int argc, char **argv, char **envp)
     error_set_progname(argv[0]);
     qemu_init_exec_dir(argv[0]);
 
+    //调用init函数(也就是各种register函数)，注册各种TypeInfo对象到type_table[]中去
     module_call_init(MODULE_INIT_QOM);
+	
     module_call_init(MODULE_INIT_QAPI);
 
 	/*
@@ -3076,38 +3100,39 @@ int main(int argc, char **argv, char **envp)
 	 *
 	 * 系统中所有的选项都在qemu_options这个数组中
 	 */
-    qemu_add_opts(&qemu_drive_opts);
-    qemu_add_drive_opts(&qemu_legacy_drive_opts);
-    qemu_add_drive_opts(&qemu_common_drive_opts);
-    qemu_add_drive_opts(&qemu_drive_opts);
-    qemu_add_drive_opts(&bdrv_runtime_opts);
-    qemu_add_opts(&qemu_chardev_opts);
-    qemu_add_opts(&qemu_device_opts);
-    qemu_add_opts(&qemu_netdev_opts);
-    qemu_add_opts(&qemu_net_opts);
-    qemu_add_opts(&qemu_rtc_opts);
-    qemu_add_opts(&qemu_global_opts);
-    qemu_add_opts(&qemu_mon_opts);
-    qemu_add_opts(&qemu_trace_opts);
-    qemu_add_opts(&qemu_option_rom_opts);
-    qemu_add_opts(&qemu_machine_opts);
-    qemu_add_opts(&qemu_mem_opts);
-    qemu_add_opts(&qemu_smp_opts);
-    qemu_add_opts(&qemu_boot_opts);
-    qemu_add_opts(&qemu_sandbox_opts);
-    qemu_add_opts(&qemu_add_fd_opts);
-    qemu_add_opts(&qemu_object_opts);
-    qemu_add_opts(&qemu_tpmdev_opts);
-    qemu_add_opts(&qemu_realtime_opts);
-    qemu_add_opts(&qemu_msg_opts);
-    qemu_add_opts(&qemu_name_opts);
-    qemu_add_opts(&qemu_numa_opts);
-    qemu_add_opts(&qemu_icount_opts);
-    qemu_add_opts(&qemu_semihosting_config_opts);
-    qemu_add_opts(&qemu_fw_cfg_opts);
+    qemu_add_opts(&qemu_drive_opts); //drive
+    qemu_add_drive_opts(&qemu_legacy_drive_opts);//drive
+    qemu_add_drive_opts(&qemu_common_drive_opts);//drive
+    qemu_add_drive_opts(&qemu_drive_opts);//drive
+    qemu_add_drive_opts(&bdrv_runtime_opts);//bdrv_common
+    qemu_add_opts(&qemu_chardev_opts);//chardev
+    qemu_add_opts(&qemu_device_opts);//device
+    qemu_add_opts(&qemu_netdev_opts);//netdev
+    qemu_add_opts(&qemu_net_opts);//net
+    qemu_add_opts(&qemu_rtc_opts);//rtc
+    qemu_add_opts(&qemu_global_opts);//global
+    qemu_add_opts(&qemu_mon_opts);//mon
+    qemu_add_opts(&qemu_trace_opts);//trace
+    qemu_add_opts(&qemu_option_rom_opts);//option-rom
+    qemu_add_opts(&qemu_machine_opts);//machine
+    qemu_add_opts(&qemu_mem_opts);//memory
+    qemu_add_opts(&qemu_smp_opts);//smp-opts
+    qemu_add_opts(&qemu_boot_opts);//boot-opts
+    qemu_add_opts(&qemu_sandbox_opts);//sandbox
+    qemu_add_opts(&qemu_add_fd_opts);//add-fd
+    qemu_add_opts(&qemu_object_opts);//object
+    qemu_add_opts(&qemu_tpmdev_opts);//tpmdev
+    qemu_add_opts(&qemu_realtime_opts);//realtime
+    qemu_add_opts(&qemu_msg_opts);//msg
+    qemu_add_opts(&qemu_name_opts);//name
+    qemu_add_opts(&qemu_numa_opts);//numa
+    qemu_add_opts(&qemu_icount_opts);//icount
+    qemu_add_opts(&qemu_semihosting_config_opts);//semihosting-config
+    qemu_add_opts(&qemu_fw_cfg_opts);//fw_cfg
 #ifdef CONFIG_LIBISCSI
-    qemu_add_opts(&qemu_iscsi_opts);
+    qemu_add_opts(&qemu_iscsi_opts);//iscsi
 #endif
+
     module_call_init(MODULE_INIT_OPTS);
 
     runstate_init();
@@ -4713,14 +4738,15 @@ int main(int argc, char **argv, char **envp)
         return 0;
     }
 
-    if (incoming) {
+    if (incoming) {//migrate过来的vm
         Error *local_err = NULL;
         qemu_start_incoming_migration(incoming, &local_err);
         if (local_err) {
             error_reportf_err(local_err, "-incoming %s: ", incoming);
             exit(1);
         }
-    } else if (autostart) {
+    } else if (autostart) {//本机启动vm
+    
         vm_start();
     }
 

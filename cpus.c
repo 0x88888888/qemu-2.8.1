@@ -1023,11 +1023,12 @@ static void qemu_kvm_wait_io_event(CPUState *cpu)
     qemu_wait_io_event_common(cpu);
 }
 
-/*
- * qemu_init_vcpu()
- *  qemu_kvm_start_vcpu()
- *   ...
- *    qemu_kvm_cpu_thread_fn()
+/* 
+ * x86_cpu_realizefn()
+ *  qemu_init_vcpu()
+ *   qemu_kvm_start_vcpu()
+ *    ...
+ *     qemu_kvm_cpu_thread_fn()
  *
  * vCPU线程
  */
@@ -1044,7 +1045,7 @@ static void *qemu_kvm_cpu_thread_fn(void *arg)
     cpu->can_do_io = 1;
     current_cpu = cpu;
 
-    //初始化vCPU信息
+    //创建和初始化vCPU信息
     r = kvm_init_vcpu(cpu);
     if (r < 0) {
         fprintf(stderr, "kvm_init_vcpu failed: %s\n", strerror(-r));
@@ -1296,6 +1297,7 @@ static void qemu_cpu_kick_thread(CPUState *cpu)
         return;
     }
     cpu->thread_kicked = true;
+    //发送IPI信号
     err = pthread_kill(cpu->thread->thread, SIG_IPI);
     if (err) {
         fprintf(stderr, "qemu:%s: %s", __func__, strerror(err));
@@ -1319,12 +1321,23 @@ static void qemu_cpu_kick_no_halt(void)
     }
 }
 
+/*
+ * main() [vl.c]
+ *  vm_start()
+ *   resume_all_vcpus()
+ *    cpu_resume()
+ *     qemu_cpu_kick()
+ *
+ * 唤醒vCPU线程
+ */
 void qemu_cpu_kick(CPUState *cpu)
 {
+    //唤醒
     qemu_cond_broadcast(cpu->halt_cond);
+	
     if (tcg_enabled()) {
         qemu_cpu_kick_no_halt();
-    } else {
+    } else { 
         qemu_cpu_kick_thread(cpu);
     }
 }
@@ -1421,6 +1434,14 @@ void pause_all_vcpus(void)
     }
 }
 
+/*
+ * main() [vl.c]
+ *  vm_start()
+ *   resume_all_vcpus()
+ *    cpu_resume()
+ *
+ * 唤醒vCPU线程
+ */
 void cpu_resume(CPUState *cpu)
 {
     cpu->stop = false;
@@ -1428,6 +1449,12 @@ void cpu_resume(CPUState *cpu)
     qemu_cpu_kick(cpu);
 }
 
+/*
+ * main() [vl.c]
+ *  vm_start()
+ *   resume_all_vcpus()
+ * 唤醒所有的vCPU线程
+ */
 void resume_all_vcpus(void)
 {
     CPUState *cpu;
@@ -1485,9 +1512,10 @@ static void qemu_tcg_init_vcpu(CPUState *cpu)
     }
 }
 
-/*
- * qemu_init_vcpu()
- *  qemu_kvm_start_vcpu()
+/* 
+ * x86_cpu_realizefn()
+ *  qemu_init_vcpu()
+ *   qemu_kvm_start_vcpu()
  */
 static void qemu_kvm_start_vcpu(CPUState *cpu)
 {
@@ -1522,6 +1550,10 @@ static void qemu_dummy_start_vcpu(CPUState *cpu)
     }
 }
 
+/* 
+ * x86_cpu_realizefn()
+ *  qemu_init_vcpu()
+ */
 void qemu_init_vcpu(CPUState *cpu)
 {
     cpu->nr_cores = smp_cores;

@@ -61,6 +61,7 @@ struct TypeImpl
     void (*instance_post_init)(Object *obj);
     void (*instance_finalize)(Object *obj);
 
+    //如果为1，就不可以实例化出instance来了
     bool abstract;
 
     const char *parent;
@@ -293,11 +294,17 @@ static void object_property_free(gpointer data)
     g_free(prop);
 }
 
+/*
+ * main() [vl.c]
+ *  object_new(typename==)
+ *   object_new_with_type()
+ *    type_initialize()
+ */
 static void type_initialize(TypeImpl *ti)
 {
     TypeImpl *parent;
 
-    if (ti->class) {
+    if (ti->class) { //如果不为NULL，就表示已经初始化过了
         return;
     }
 
@@ -322,6 +329,7 @@ static void type_initialize(TypeImpl *ti)
         ti->class->properties = g_hash_table_new_full(
             g_str_hash, g_str_equal, g_free, object_property_free);
 
+        //initialize 接口
         for (e = parent->class->interfaces; e; e = e->next) {
             InterfaceClass *iface = e->data;
             ObjectClass *klass = OBJECT_CLASS(iface);
@@ -361,6 +369,7 @@ static void type_initialize(TypeImpl *ti)
     }
 
     if (ti->class_init) {
+		//x86_cpu_common_class_init
         ti->class_init(ti->class, ti->class_data);
     }
 }
@@ -517,6 +526,11 @@ static void object_finalize(void *data)
     }
 }
 
+/*
+ * main() [vl.c]
+ *  object_new(typename==)
+ *   object_new_with_type()
+ */
 Object *object_new_with_type(Type type)
 {
     Object *obj;

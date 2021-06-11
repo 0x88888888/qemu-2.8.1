@@ -445,6 +445,13 @@ struct Object
  * 所有的TypeInfo对象都转成TypeImpl存储在静态函数type_table_get(void)函数中定义的静态对象type_table中 
  *
  * e1000_base_info --e1000-base
+ *
+ * 类型，对象相关的步骤 
+ * 1:注册类型 , (1),type_init,(2)register_module_init,(3)type_register
+ * 2:类型初始化 (1),type_initialize
+ * 3.对象初始化 (1),object_new,(2)object_initialize,(3)object_initialize_with_type
+ *
+ * type_new产生TypeImpl对象,TypeImpl对象中存放了类型的所有信息
  */
 struct TypeInfo
 {

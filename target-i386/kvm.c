@@ -702,6 +702,7 @@ int kvm_arch_init_vcpu(CPUState *cs)
         struct kvm_cpuid2 cpuid;
         struct kvm_cpuid_entry2 entries[KVM_MAX_CPUID_ENTRIES];
     } QEMU_PACKED cpuid_data;
+	
     X86CPU *cpu = X86_CPU(cs);
     CPUX86State *env = &cpu->env;
     uint32_t limit, i, j, cpuid_i;
@@ -792,6 +793,7 @@ int kvm_arch_init_vcpu(CPUState *cs)
         c->eax = env->features[FEAT_KVM];
     }
 
+    //构建cpuid指令需要的数据
     cpu_x86_cpuid(env, 0, 0, &limit, &unused, &unused, &unused);
 
     for (i = 0; i <= limit; i++) {
@@ -2771,6 +2773,16 @@ int kvm_arch_get_registers(CPUState *cs)
     return ret;
 }
 
+/*
+ * qemu_init_vcpu()
+ *  qemu_kvm_start_vcpu()
+ *   ...
+ *    qemu_kvm_cpu_thread_fn() vCPU线程
+ *     kvm_cpu_exec()
+ *      kvm_arch_pre_run()
+ *
+ * 在KVM_RUN之前，做一些准备工作，必然注入nmi和smi中断
+ */
 void kvm_arch_pre_run(CPUState *cpu, struct kvm_run *run)
 {
     X86CPU *x86_cpu = X86_CPU(cpu);
@@ -2779,17 +2791,21 @@ void kvm_arch_pre_run(CPUState *cpu, struct kvm_run *run)
 
     /* Inject NMI */
     if (cpu->interrupt_request & (CPU_INTERRUPT_NMI | CPU_INTERRUPT_SMI)) {
+
+	    //注入NMI中断
         if (cpu->interrupt_request & CPU_INTERRUPT_NMI) {
             qemu_mutex_lock_iothread();
             cpu->interrupt_request &= ~CPU_INTERRUPT_NMI;
             qemu_mutex_unlock_iothread();
             DPRINTF("injected NMI\n");
+			
             ret = kvm_vcpu_ioctl(cpu, KVM_NMI);
             if (ret < 0) {
                 fprintf(stderr, "KVM: injection failed, NMI lost (%s)\n",
                         strerror(-ret));
             }
         }
+		//注入SMI中断
         if (cpu->interrupt_request & CPU_INTERRUPT_SMI) {
             qemu_mutex_lock_iothread();
             cpu->interrupt_request &= ~CPU_INTERRUPT_SMI;

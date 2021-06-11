@@ -298,6 +298,9 @@ struct qemu_work_item;
  * @trace_dstate: Dynamic tracing state of events for this vCPU (bitmask).
  *
  * State of one CPU core or thread.
+ *
+ * 所有CPU都同样的数据
+ * 嵌入到X86CPU中
  */
 struct CPUState {
     /*< private >*/
@@ -363,6 +366,7 @@ struct CPUState {
     int kvm_fd;
     bool kvm_vcpu_dirty;
     struct KVMState *kvm_state;
+	//这个对象是QEMU和KVM的共享内存，内核用这个来和用户态qemu程序交流
     struct kvm_run *kvm_run;
 
     /*

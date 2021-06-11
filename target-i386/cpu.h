@@ -1130,6 +1130,11 @@ typedef struct CPUX86State {
     /* Maximum level/xlevel/xlevel2 value for auto-assignment: */
     uint32_t cpuid_max_level, cpuid_max_xlevel, cpuid_max_xlevel2;
     /* Actual level/xlevel/xlevel2 value: */
+	/*
+	 * cpuid_level表示cpuid最大的基础功能号
+	 * cpuid_xlevel表示cpuid最大的扩展功能号
+	 * cpuid_xlevel2用于Centaur CPU
+	 */
     uint32_t cpuid_level, cpuid_xlevel, cpuid_xlevel2;
     uint32_t cpuid_vendor1;
     uint32_t cpuid_vendor2;
@@ -1202,9 +1207,15 @@ struct X86CPU {
     bool hyperv_stimer;
     bool check_cpuid;
     bool enforce_cpuid;
+	/*
+	 * 是否让guest知道 guest os运行在kvm上,
+	 * 如果让guest os运行在kvm上，通过cpuid eax=0x40000000来确定是否可运行在kvm上
+	 * 这个cpuid的返回值是qemu构造出来的
+	 */
     bool expose_kvm;
     bool migratable;
     bool host_features;
+	//cpu对应的lapic id
     uint32_t apic_id;
 
     /* if true the CPUID code directly forward host cache leaves to the guest */
@@ -1255,6 +1266,7 @@ struct X86CPU {
 
     struct kvm_msrs *kvm_msr_buf;
 
+    //下面几个表示虚拟机CPU在系统上的拓扑信息
     int32_t socket_id;
     int32_t core_id;
     int32_t thread_id;

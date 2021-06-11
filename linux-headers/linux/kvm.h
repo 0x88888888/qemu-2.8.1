@@ -224,7 +224,10 @@ struct kvm_hyperv_exit {
 /* Encounter unexpected vm-exit due to delivery event. */
 #define KVM_INTERNAL_ERROR_DELIVERY_EV	3
 
-/* for KVM_RUN, returned by mmap(vcpu_fd, offset=0) */
+/* for KVM_RUN, returned by mmap(vcpu_fd, offset=0) 
+ * 
+ * 这个对象是KVM和QEMU的共享内存，一个page的大小
+ */
 struct kvm_run {
 	/* in */
 	__u8 request_interrupt_window;

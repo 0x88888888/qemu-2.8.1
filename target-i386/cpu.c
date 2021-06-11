@@ -718,14 +718,18 @@ static char *x86_cpu_class_get_model_name(X86CPUClass *cc)
 }
 
 struct X86CPUDefinition {
+    //CPU名称
     const char *name;
+	//CPUID指令支持最大的功能号
     uint32_t level;
+	//CPUID扩展指令支持最大的功能号
     uint32_t xlevel;
     /* vendor is zero-terminated, 12 character ASCII string */
     char vendor[CPUID_VENDOR_SZ + 1];
     int family;
     int model;
     int stepping;
+	//cpu特性数组
     FeatureWordArray features;
     char model_id[48];
 };
@@ -2317,7 +2321,12 @@ static void x86_cpu_apply_props(X86CPU *cpu, PropValue *props)
     }
 }
 
-/* Load data from X86CPUDefinition
+
+/*
+ * x86_cpu_initfn()
+ *  x86_cpu_load_def()
+ *
+ * Load data from X86CPUDefinition
  */
 static void x86_cpu_load_def(X86CPU *cpu, X86CPUDefinition *def, Error **errp)
 {
@@ -2406,7 +2415,21 @@ void cpu_clear_apic_feature(CPUX86State *env)
 
 #endif /* !CONFIG_USER_ONLY */
 
-void cpu_x86_cpuid(CPUX86State *env, uint32_t index, uint32_t count,
+/*
+ * qemu_init_vcpu()
+ *  qemu_kvm_start_vcpu()
+ *   ...
+ *    qemu_kvm_cpu_thread_fn()
+ *     kvm_init_vcpu()
+ *      kvm_arch_init_vcpu()
+ *       cpu_x86_cpuid()
+ *
+ * 构建cpuid指令需要的数据
+ *
+ * 用于构造一项指定的cpuid数据
+ * 根据已经存放在env中的信息额host主机的cpuid信息来构造出虚拟机的cpuid信息
+ */
+void cpu_x86_cpuid(CPUX86State *env, uint32_t index /* 主功能号 */, uint32_t count /* 子功能号 */,
                    uint32_t *eax, uint32_t *ebx,
                    uint32_t *ecx, uint32_t *edx)
 {
@@ -2437,6 +2460,7 @@ void cpu_x86_cpuid(CPUX86State *env, uint32_t index, uint32_t count,
             index = env->cpuid_level;
     }
 
+    //根据主功能号，来返回信息
     switch(index) {
     case 0:
         *eax = env->cpuid_level;
@@ -2939,6 +2963,10 @@ static void x86_cpu_machine_reset_cb(void *opaque)
 }
 #endif
 
+/*
+ * x86_cpu_realizefn()
+ *  mce_init()
+ */
 static void mce_init(X86CPU *cpu)
 {
     CPUX86State *cenv = &cpu->env;
@@ -2970,6 +2998,10 @@ APICCommonClass *apic_get_class(void)
     return APIC_COMMON_CLASS(object_class_by_name(apic_type));
 }
 
+/* 
+ * x86_cpu_realizefn()
+ *  x86_cpu_apic_create()
+ */
 static void x86_cpu_apic_create(X86CPU *cpu, Error **errp)
 {
     APICCommonState *apic;
@@ -2988,6 +3020,10 @@ static void x86_cpu_apic_create(X86CPU *cpu, Error **errp)
     apic->apicbase = APIC_DEFAULT_ADDRESS | MSR_IA32_APICBASE_ENABLE;
 }
 
+/*
+ * x86_cpu_realizefn()
+ *  x86_cpu_apic_realize()
+ */
 static void x86_cpu_apic_realize(X86CPU *cpu, Error **errp)
 {
     APICCommonState *apic;
@@ -3112,7 +3148,12 @@ static void x86_cpu_enable_xsave_components(X86CPU *cpu)
     env->features[FEAT_XSAVE_COMP_HI] = mask >> 32;
 }
 
-/* Load CPUID data based on configured features */
+/*
+ * x86_cpu_realizefn()
+ *  x86_cpu_load_features()
+ *
+ * Load CPUID data based on configured features 
+ */
 static void x86_cpu_load_features(X86CPU *cpu, Error **errp)
 {
     CPUX86State *env = &cpu->env;
@@ -3308,6 +3349,8 @@ static void x86_cpu_realizefn(DeviceState *dev, Error **errp)
             cpu->phys_bits = 32;
         }
     }
+
+	//将cs添加到cpus链表中去
     cpu_exec_realizefn(cs, &local_err);
     if (local_err != NULL) {
         error_propagate(errp, local_err);
@@ -3679,6 +3722,13 @@ static Property x86_cpu_properties[] = {
     DEFINE_PROP_END_OF_LIST()
 };
 
+/*
+ * main() [vl.c]
+ *  object_new(typename==)
+ *   object_new_with_type()
+ *    type_initialize()
+ *     x86_cpu_common_class_init()
+ */
 static void x86_cpu_common_class_init(ObjectClass *oc, void *data)
 {
     X86CPUClass *xcc = X86_CPU_CLASS(oc);

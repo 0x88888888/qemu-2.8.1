@@ -1087,6 +1087,12 @@ void pc_acpi_smi_interrupt(void *opaque, int irq, int level)
     }
 }
 
+/*
+ * DEFINE_I440FX_MACHINE 定于出来的函数pc_init_##suffix()调用
+ *  pc_init1()
+ *   pc_cpus_init()
+ *    pc_new_cpu()
+ */
 static X86CPU *pc_new_cpu(const char *typename, int64_t apic_id,
                           Error **errp)
 {
@@ -1190,7 +1196,8 @@ void pc_cpus_init(PCMachineState *pcms)
     for (i = 0; i < max_cpus; i++) {
         pcms->possible_cpus->cpus[i].arch_id = x86_cpu_apic_id_from_index(i);
         pcms->possible_cpus->len++;
-        if (i < smp_cpus) {
+	
+        if (i < smp_cpus) {//创建X86CPU对象出来
             cpu = pc_new_cpu(typename, x86_cpu_apic_id_from_index(i),
                              &error_fatal);
             object_unref(OBJECT(cpu));

@@ -344,6 +344,10 @@ static void virtio_pci_stop_ioeventfd(VirtIOPCIProxy *proxy)
     virtio_bus_stop_ioeventfd(&proxy->bus);
 }
 
+/*
+ * virtio_pci_config_write()
+ *  virtio_ioport_write()
+ */
 static void virtio_ioport_write(void *opaque, uint32_t addr, uint32_t val)
 {
     VirtIOPCIProxy *proxy = opaque;
@@ -366,7 +370,7 @@ static void virtio_ioport_write(void *opaque, uint32_t addr, uint32_t val)
         else
             virtio_queue_set_addr(vdev, vdev->queue_sel, pa);
         break;
-    case VIRTIO_PCI_QUEUE_SEL:
+    case VIRTIO_PCI_QUEUE_SEL://选择virtio queue
         if (val < VIRTIO_QUEUE_MAX)
             vdev->queue_sel = val;
         break;
@@ -503,6 +507,7 @@ static void virtio_pci_config_write(void *opaque, hwaddr addr,
     VirtIOPCIProxy *proxy = opaque;
     uint32_t config = VIRTIO_PCI_CONFIG_SIZE(&proxy->pci_dev);
     VirtIODevice *vdev = virtio_bus_get_device(&proxy->bus);
+	
     if (addr < config) {
         virtio_ioport_write(proxy, addr, val);
         return;

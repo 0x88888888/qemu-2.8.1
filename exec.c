@@ -668,6 +668,10 @@ void cpu_exec_initfn(CPUState *cpu)
 #endif
 }
 
+/*
+ * x86_cpu_realizefn()
+ *  cpu_exec_realizefn()
+ */
 void cpu_exec_realizefn(CPUState *cpu, Error **errp)
 {
     CPUClass *cc ATTRIBUTE_UNUSED = CPU_GET_CLASS(cpu);

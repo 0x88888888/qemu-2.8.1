@@ -222,6 +222,7 @@ struct kvm_cpuid_entry2 {
 
 /* for KVM_SET_CPUID2 */
 struct kvm_cpuid2 {
+    //entries中的数量,每一项cpuid数据都由kvm_cpuid_entry2表示
 	__u32 nent;
 	__u32 padding;
 	struct kvm_cpuid_entry2 entries[0];
