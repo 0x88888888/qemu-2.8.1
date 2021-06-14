@@ -408,6 +408,13 @@ void numa_post_machine_init(void)
     }
 }
 
+/*
+ * DEFINE_I440FX_MACHINE 定于出来的函数pc_init_##suffix()调用
+ *  pc_init1()
+ *   pc_memory_init()
+ *    memory_region_allocate_system_memory()
+ *     allocate_system_memory_nonnuma()
+ */
 static void allocate_system_memory_nonnuma(MemoryRegion *mr, Object *owner,
                                            const char *name,
                                            uint64_t ram_size)
@@ -438,6 +445,12 @@ static void allocate_system_memory_nonnuma(MemoryRegion *mr, Object *owner,
     vmstate_register_ram_global(mr);
 }
 
+/*
+ * DEFINE_I440FX_MACHINE 定于出来的函数pc_init_##suffix()调用
+ *  pc_init1()
+ *   pc_memory_init()
+ *    memory_region_allocate_system_memory()
+ */
 void memory_region_allocate_system_memory(MemoryRegion *mr, Object *owner,
                                           const char *name,
                                           uint64_t ram_size)
@@ -445,7 +458,7 @@ void memory_region_allocate_system_memory(MemoryRegion *mr, Object *owner,
     uint64_t addr = 0;
     int i;
 
-    if (nb_numa_nodes == 0 || !have_memdevs) {
+    if (nb_numa_nodes == 0 || !have_memdevs) { //非numa
         allocate_system_memory_nonnuma(mr, owner, name, ram_size);
         return;
     }

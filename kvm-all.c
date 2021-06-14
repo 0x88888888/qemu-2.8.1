@@ -71,8 +71,14 @@ struct KVMState
 {
     AccelState parent_obj;
 
+    /*
+     * memory_listener->slots[]中KVMSlot对象的数量
+     */
     int nr_slots;
     int fd;
+	/*
+	 * 指向虚拟机的fd
+	 */
     int vmfd;
 	//是否支持KVM_CAP_COALESCED_MMIO
     int coalesced_mmio;
@@ -107,11 +113,15 @@ struct KVMState
     unsigned int gsi_count;
     QTAILQ_HEAD(msi_hashtab, KVMMSIRoute) msi_hashtab[KVM_MSI_HASHTAB_SIZE];
 #endif
+    /*
+     * 控制vm的内存，主要是控制控制guest 内存pa和 host qemu进程内存的va对应关系
+     */
     KVMMemoryListener memory_listener;
     QLIST_HEAD(, KVMParkedVcpu) kvm_parked_vcpus;
 };
 
 KVMState *kvm_state;
+
 bool kvm_kernel_irqchip;
 bool kvm_split_irqchip;
 bool kvm_async_interrupts_allowed;
@@ -240,6 +250,15 @@ int kvm_physical_memory_addr_from_host(KVMState *s, void *ram,
     return 0;
 }
 
+/* 
+ * kvm_region_add()
+ *  kvm_set_phys_mem(add=true)
+ *   kvm_set_user_memory_region()
+ *
+ * kvm_region_del()
+ *  kvm_set_phys_mem(add=false)
+ *   kvm_set_user_memory_region()
+ */
 static int kvm_set_user_memory_region(KVMMemoryListener *kml, KVMSlot *slot)
 {
     KVMState *s = kvm_state;
@@ -256,6 +275,7 @@ static int kvm_set_user_memory_region(KVMMemoryListener *kml, KVMSlot *slot)
         mem.memory_size = 0;
         kvm_vm_ioctl(s, KVM_SET_USER_MEMORY_REGION, &mem);
     }
+	
     mem.memory_size = slot->memory_size;
     return kvm_vm_ioctl(s, KVM_SET_USER_MEMORY_REGION, &mem);
 }
@@ -717,6 +737,13 @@ kvm_check_extension_list(KVMState *s, const KVMCapabilityInfo *list)
     return NULL;
 }
 
+/* 
+ * kvm_region_add()
+ *  kvm_set_phys_mem(add=true)
+ *
+ * kvm_region_del()
+ *  kvm_set_phys_mem(add=false)
+ */
 static void kvm_set_phys_mem(KVMMemoryListener *kml,
                              MemoryRegionSection *section, bool add)
 {
@@ -745,7 +772,7 @@ static void kvm_set_phys_mem(KVMMemoryListener *kml,
         return;
     }
 
-    if (!memory_region_is_ram(mr)) {
+    if (!memory_region_is_ram(mr)) {//MMIO这种内存不是RAM
         if (writeable || !kvm_readonly_mem_allowed) {
             return;
         } else if (!mr->romd_mode) {
@@ -803,6 +830,7 @@ static void kvm_set_phys_mem(KVMMemoryListener *kml,
             mem->ram = old.ram;
             mem->flags = kvm_mem_flags(mr);
 
+            //这里
             err = kvm_set_user_memory_region(kml, mem);
             if (err) {
                 fprintf(stderr, "%s: error updating slot: %s\n", __func__,
@@ -824,6 +852,7 @@ static void kvm_set_phys_mem(KVMMemoryListener *kml,
             mem->ram = old.ram;
             mem->flags =  kvm_mem_flags(mr);
 
+            //这里
             err = kvm_set_user_memory_region(kml, mem);
             if (err) {
                 fprintf(stderr, "%s: error registering prefix slot: %s\n",
@@ -848,6 +877,7 @@ static void kvm_set_phys_mem(KVMMemoryListener *kml,
             mem->ram = old.ram + size_delta;
             mem->flags = kvm_mem_flags(mr);
 
+			//这里
             err = kvm_set_user_memory_region(kml, mem);
             if (err) {
                 fprintf(stderr, "%s: error registering suffix slot: %s\n",
@@ -870,6 +900,7 @@ static void kvm_set_phys_mem(KVMMemoryListener *kml,
     mem->ram = ram;
     mem->flags = kvm_mem_flags(mr);
 
+	//这里
     err = kvm_set_user_memory_region(kml, mem);
     if (err) {
         fprintf(stderr, "%s: error registering slot: %s\n", __func__,
@@ -988,6 +1019,7 @@ void kvm_memory_listener_register(KVMState *s, KVMMemoryListener *kml,
 {
     int i;
 
+    //分配nr_slots个KVMSlot
     kml->slots = g_malloc0(s->nr_slots * sizeof(KVMSlot));
     kml->as_id = as_id;
 
@@ -1537,6 +1569,7 @@ static void kvm_irqchip_create(MachineState *machine, KVMState *s)
 {
     int ret;
 
+    //返回1
     if (kvm_check_extension(s, KVM_CAP_IRQCHIP)) {
         ;
     } else if (kvm_check_extension(s, KVM_CAP_S390_IRQCHIP)) {
@@ -1550,13 +1583,17 @@ static void kvm_irqchip_create(MachineState *machine, KVMState *s)
     }
 
     /* First probe and see if there's a arch-specific hook to create the
-     * in-kernel irqchip for us */
+     * in-kernel irqchip for us 
+     * 
+     *
+     */
     ret = kvm_arch_irqchip_create(machine, s);
     if (ret == 0) {
         if (machine_kernel_irqchip_split(machine)) {
             perror("Split IRQ chip mode not supported.");
             exit(1);
         } else {
+			//在KVM创建IRQCHIP,实际上是kvm创建模拟pic
             ret = kvm_vm_ioctl(s, KVM_CREATE_IRQCHIP);
         }
     }

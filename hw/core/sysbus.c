@@ -340,6 +340,12 @@ static const TypeInfo sysbus_device_type_info = {
 /* This is a nasty hack to allow passing a NULL bus to qdev_create.  */
 static BusState *main_system_bus;
 
+/*
+ * main() [vl.c]
+ *  sysbus_get_default()
+ *   main_system_bus_create()
+ * 创建系统总线
+ */
 static void main_system_bus_create(void)
 {
     /* assign main_system_bus before qbus_create_inplace()
@@ -353,6 +359,11 @@ static void main_system_bus_create(void)
                               "sysbus", OBJECT(main_system_bus), NULL);
 }
 
+/*
+ * main() [vl.c]
+ *  sysbus_get_default()
+ * 获取系统总线
+ */
 BusState *sysbus_get_default(void)
 {
     if (!main_system_bus) {

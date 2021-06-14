@@ -38,9 +38,15 @@ static bool memory_region_update_pending;
 static bool ioeventfd_update_pending;
 static bool global_dirty_log = false;
 
+/*
+ * QEMU中所有的MemoryListener都链接到这个链表上来
+ */
 static QTAILQ_HEAD(memory_listeners, MemoryListener) memory_listeners
     = QTAILQ_HEAD_INITIALIZER(memory_listeners);
 
+/* 
+ * 链接到AddressSpace->address_spaces_link上
+ */
 static QTAILQ_HEAD(, AddressSpace) address_spaces
     = QTAILQ_HEAD_INITIALIZER(address_spaces);
 
@@ -207,10 +213,17 @@ static bool memory_region_ioeventfd_equal(MemoryRegionIoeventfd a,
 typedef struct FlatRange FlatRange;
 typedef struct FlatView FlatView;
 
-/* Range of memory in the global map.  Addresses are absolute. */
+/* Range of memory in the global map.  Addresses are absolute. 
+ *
+ * MemoryRegion展开后的内存拓扑由FlatRange表示
+ * 每一个FlatRange表示MemoryRegion中的一段物理内存空间
+ */
 struct FlatRange {
+    //所属MemoryRegion
     MemoryRegion *mr;
+	//FlatRegion在MemoryRegion中的偏移
     hwaddr offset_in_region;
+	//地址和大小
     AddrRange addr;
     uint8_t dirty_log_mask;
     bool romd_mode;
@@ -219,12 +232,16 @@ struct FlatRange {
 
 /* Flattened global view of current active memory hierarchy.  Kept in sorted
  * order.
+ *
+ * 表示一个AddressSpace对应Flat视角
  */
 struct FlatView {
     struct rcu_head rcu;
     unsigned ref;
     FlatRange *ranges;
+	//表示nr个FlatRange
     unsigned nr;
+	//已经分配了nr_allocated个FlatRange
     unsigned nr_allocated;
 };
 
@@ -315,7 +332,15 @@ static bool can_merge(FlatRange *r1, FlatRange *r2)
         && r1->readonly == r2->readonly;
 }
 
-/* Attempt to simplify a view by merging adjacent ranges */
+/* Attempt to simplify a view by merging adjacent ranges 
+ *
+ * memory_region_transaction_commit()
+ *  address_space_update_topology()
+ *   generate_memory_topology()
+ *    flatview_simplify()
+ *
+ * 对FlatView中能够合并的FlatRange进行合并
+ */
 static void flatview_simplify(FlatView *view)
 {
     unsigned i, j;
@@ -613,11 +638,18 @@ static AddressSpace *memory_region_to_address_space(MemoryRegion *mr)
 
 /* Render a memory region into the global view.  Ranges in @view obscure
  * ranges in @mr.
+ *
+ * memory_region_transaction_commit()
+ *  address_space_update_topology()
+ *   generate_memory_topology()
+ *    render_memory_region()
+ *
+ * 这个函数是MemoryRegion 进行Flat的核心函数
  */
 static void render_memory_region(FlatView *view,
                                  MemoryRegion *mr,
                                  Int128 base,
-                                 AddrRange clip,
+                                 AddrRange clip,//guest os的一段物理地址范围
                                  bool readonly)
 {
     MemoryRegion *subregion;
@@ -637,25 +669,30 @@ static void render_memory_region(FlatView *view,
 
     tmp = addrrange_make(base, mr->size);
 
-    if (!addrrange_intersects(tmp, clip)) {
+    
+    if (!addrrange_intersects(tmp, clip)) {//地址没有交集
         return;
     }
 
+    //地址空间的交集范围
     clip = addrrange_intersection(tmp, clip);
 
-    if (mr->alias) {
+    if (mr->alias) { //如果是一个alias MemoryRegion,需要用实际的MemoryRegion来Flat化
         int128_subfrom(&base, int128_make64(mr->alias->addr));
         int128_subfrom(&base, int128_make64(mr->alias_offset));
         render_memory_region(view, mr->alias, base, clip, readonly);
         return;
     }
 
-    /* Render subregions in priority order. */
+    /* Render subregions in priority order. 
+     * 
+     *　递归展开MemoryRegion
+	 */
     QTAILQ_FOREACH(subregion, &mr->subregions, subregions_link) {
         render_memory_region(view, subregion, base, clip, readonly);
     }
 
-    if (!mr->terminates) {
+    if (!mr->terminates) {//非叶子节点
         return;
     }
 
@@ -663,6 +700,7 @@ static void render_memory_region(FlatView *view,
     base = clip.start;
     remain = clip.size;
 
+	//初始化一个FlatRegion
     fr.mr = mr;
     fr.dirty_log_mask = memory_region_get_dirty_log_mask(mr);
     fr.romd_mode = mr->romd_mode;
@@ -698,18 +736,30 @@ static void render_memory_region(FlatView *view,
     }
 }
 
-/* Render a memory topology into a list of disjoint absolute ranges. */
+/*
+ * Render a memory topology into a list of disjoint absolute ranges. 
+ *
+ * memory_region_transaction_commit()
+ *  address_space_update_topology()
+ *   generate_memory_topology()
+ */
 static FlatView *generate_memory_topology(MemoryRegion *mr)
 {
     FlatView *view;
 
     view = g_new(FlatView, 1);
+
+	//产生一个空的FlatView
     flatview_init(view);
 
     if (mr) {
+		/*
+		 *把MemoryRegion中的内存拓扑图展开，变成一个FlatView视图
+		 */
         render_memory_region(view, mr, int128_zero(),
                              addrrange_make(int128_zero(), int128_2_64()), false);
     }
+	//对FlatView中能够合并的FlatRange进行合并
     flatview_simplify(view);
 
     return view;
@@ -809,6 +859,11 @@ static void address_space_update_ioeventfds(AddressSpace *as)
     flatview_unref(view);
 }
 
+/* 
+ * memory_region_transaction_commit()
+ *  address_space_update_topology()
+ *   address_space_update_topology_pass()
+ */
 static void address_space_update_topology_pass(AddressSpace *as,
                                                const FlatView *old_view,
                                                const FlatView *new_view,
@@ -877,9 +932,14 @@ static void address_space_update_topology_pass(AddressSpace *as,
 }
 
 
+/* 
+ * memory_region_transaction_commit()
+ *  address_space_update_topology()
+ */
 static void address_space_update_topology(AddressSpace *as)
 {
     FlatView *old_view = address_space_get_flatview(as);
+	//将AddressSpace->root图中的内存Flat化
     FlatView *new_view = generate_memory_topology(as->root);
 
     address_space_update_topology_pass(as, old_view, new_view, false);
@@ -912,6 +972,14 @@ static void memory_region_clear_pending(void)
     ioeventfd_update_pending = false;
 }
 
+/*
+ * memory_region_set_readonly()
+ * memory_region_rom_device_set_romd()
+ * memory_region_update_container_subregions()
+ * memory_region_del_subregion()
+ *  memory_region_transaction_commit()
+ *
+ */
 void memory_region_transaction_commit(void)
 {
     AddressSpace *as;
@@ -920,12 +988,15 @@ void memory_region_transaction_commit(void)
     --memory_region_transaction_depth;
     if (!memory_region_transaction_depth) {
         if (memory_region_update_pending) {
+			//调用MemoryListener->begin函数
             MEMORY_LISTENER_CALL_GLOBAL(begin, Forward);
 
+            //调用这个address_spaces->address_spaces_link所有的address_space_update_topology
             QTAILQ_FOREACH(as, &address_spaces, address_spaces_link) {
                 address_space_update_topology(as);
             }
 
+            //调用MemoryListener->commit函数,通知到KVM
             MEMORY_LISTENER_CALL_GLOBAL(commit, Forward);
         } else if (ioeventfd_update_pending) {
             QTAILQ_FOREACH(as, &address_spaces, address_spaces_link) {
@@ -1006,6 +1077,7 @@ void memory_region_init(MemoryRegion *mr,
         g_free(name_array);
         g_free(escaped_name);
     }
+	
 }
 
 static void memory_region_get_addr(Object *obj, Visitor *v, const char *name,
@@ -1339,8 +1411,16 @@ MemTxResult memory_region_dispatch_write(MemoryRegion *mr,
     }
 }
 
+/*
+ * main() [vl.c]
+ *  cpu_exec_init_all()
+ *   io_mem_init()
+ *    memory_region_init_io()
+ *
+ * 创建一个MMIO 的MemoryRegion
+ */
 void memory_region_init_io(MemoryRegion *mr,
-                           Object *owner,
+                           Object *owner,//mr的父MemoryRegion
                            const MemoryRegionOps *ops,
                            void *opaque,
                            const char *name,
@@ -1362,6 +1442,7 @@ void memory_region_init_ram(MemoryRegion *mr,
     mr->ram = true;
     mr->terminates = true;
     mr->destructor = memory_region_destructor_ram;
+	//分配一个RAMBlock
     mr->ram_block = qemu_ram_alloc(size, mr, errp);
     mr->dirty_log_mask = tcg_enabled() ? (1 << DIRTY_MEMORY_CODE) : 0;
 }
@@ -2019,6 +2100,11 @@ void memory_region_del_eventfd(MemoryRegion *mr,
     memory_region_transaction_commit();
 }
 
+/* 
+ * memory_region_add_subregion()
+ *  memory_region_add_subregion_common()
+ *   memory_region_update_container_subregions()
+ */
 static void memory_region_update_container_subregions(MemoryRegion *subregion)
 {
     MemoryRegion *mr = subregion->container;
@@ -2033,12 +2119,17 @@ static void memory_region_update_container_subregions(MemoryRegion *subregion)
             goto done;
         }
     }
+	
     QTAILQ_INSERT_TAIL(&mr->subregions, subregion, subregions_link);
 done:
     memory_region_update_pending |= mr->enabled && subregion->enabled;
     memory_region_transaction_commit();
 }
 
+/* 
+ * memory_region_add_subregion()
+ *  memory_region_add_subregion_common()
+ */
 static void memory_region_add_subregion_common(MemoryRegion *mr,
                                                hwaddr offset,
                                                MemoryRegion *subregion)
@@ -2049,6 +2140,9 @@ static void memory_region_add_subregion_common(MemoryRegion *mr,
     memory_region_update_container_subregions(subregion);
 }
 
+/* 
+ * 将MemoryRegion添加到一个container中去
+ */
 void memory_region_add_subregion(MemoryRegion *mr,
                                  hwaddr offset,
                                  MemoryRegion *subregion)
@@ -2057,6 +2151,12 @@ void memory_region_add_subregion(MemoryRegion *mr,
     memory_region_add_subregion_common(mr, offset, subregion);
 }
 
+/*
+ * 将一个MemoryRegion添加到一个container中去，允许其重复，
+ * 当重复的时候，谁的priority大谁就能被虚拟机看见.
+ *
+ * 如果有两个MemoryRegion并不完全重合,那优先级低的还是会有一部分能够被虚拟机看见
+ */
 void memory_region_add_subregion_overlap(MemoryRegion *mr,
                                          hwaddr offset,
                                          MemoryRegion *subregion,

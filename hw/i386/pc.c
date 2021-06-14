@@ -1376,6 +1376,8 @@ void xen_load_linux(PCMachineState *pcms)
  * DEFINE_I440FX_MACHINE 定于出来的函数pc_init_##suffix()调用
  *  pc_init1()
  *   pc_memory_init()
+ *
+ *内存初始化
  */
 void pc_memory_init(PCMachineState *pcms,
                     MemoryRegion *system_memory,
@@ -1398,6 +1400,7 @@ void pc_memory_init(PCMachineState *pcms,
      * aliases to address portions of it, mostly for backwards compatibility
      * with older qemus that used qemu_ram_alloc().
      */
+     //分配虚拟机物理内存RAM
     ram = g_malloc(sizeof(*ram));
     memory_region_allocate_system_memory(ram, NULL, "pc.ram",
                                          machine->ram_size);
@@ -1406,6 +1409,7 @@ void pc_memory_init(PCMachineState *pcms,
     memory_region_init_alias(ram_below_4g, NULL, "ram-below-4g", ram,
                              0, pcms->below_4g_mem_size);
     memory_region_add_subregion(system_memory, 0, ram_below_4g);
+	//将小于4g的物理内存加到 /etc/e820表中供BIOS使用
     e820_add_entry(0, pcms->below_4g_mem_size, E820_RAM);
     if (pcms->above_4g_mem_size > 0) {
         ram_above_4g = g_malloc(sizeof(*ram_above_4g));

@@ -170,9 +170,17 @@ typedef struct PhysPageMap {
     MemoryRegionSection *sections;
 } PhysPageMap;
 
+/*
+ * 当给定一个AddressSpace和地址时,能够快速地找出其所在MemoryRegionSection，从而找到对应的MemoryRegion
+ * 
+ * 在AddressSpace中有dispatch和next_dispatch两个AddressSpaceDispatch对象
+ */ 
 struct AddressSpaceDispatch {
     struct rcu_head rcu;
 
+    /*
+     * 保存最近一次找到的MemoryRegionSection
+     */
     MemoryRegionSection *mru_section;
     /* This is a multi-level map on the physical address space.
      * The bottom level has pointers to MemoryRegionSections.
@@ -1708,6 +1716,11 @@ RAMBlock *qemu_ram_alloc_from_file(ram_addr_t size, MemoryRegion *mr,
 }
 #endif
 
+/* 
+ * memory_region_init_ram()
+ *  qemu_ram_alloc()
+ *   qemu_ram_alloc_internal()
+ */
 static
 RAMBlock *qemu_ram_alloc_internal(ram_addr_t size, ram_addr_t max_size,
                                   void (*resized)(const char*,
@@ -1726,6 +1739,7 @@ RAMBlock *qemu_ram_alloc_internal(ram_addr_t size, ram_addr_t max_size,
     new_block->resized = resized;
     new_block->used_length = size;
     new_block->max_length = max_size;
+	
     assert(max_size >= size);
     new_block->fd = -1;
     new_block->page_size = getpagesize();
@@ -1736,6 +1750,7 @@ RAMBlock *qemu_ram_alloc_internal(ram_addr_t size, ram_addr_t max_size,
     if (resizeable) {
         new_block->flags |= RAM_RESIZEABLE;
     }
+	//添加new_block到ram_list中去
     ram_block_add(new_block, &local_err);
     if (local_err) {
         g_free(new_block);
@@ -1751,6 +1766,10 @@ RAMBlock *qemu_ram_alloc_from_ptr(ram_addr_t size, void *host,
     return qemu_ram_alloc_internal(size, size, NULL, host, false, mr, errp);
 }
 
+/* 
+ * memory_region_init_ram()
+ *  qemu_ram_alloc()
+ */
 RAMBlock *qemu_ram_alloc(ram_addr_t size, MemoryRegion *mr, Error **errp)
 {
     return qemu_ram_alloc_internal(size, size, NULL, NULL, false, mr, errp);
@@ -2335,6 +2354,10 @@ MemoryRegion *iotlb_to_region(CPUState *cpu, hwaddr index, MemTxAttrs attrs)
  * main() [vl.c]
  *  cpu_exec_init_all()
  *   io_mem_init()
+ *
+ * 创建若干个包含所有地址空间的MemoryRegion
+ *
+ * 创建MMIO的 MemoryRegion
  */
 static void io_mem_init(void)
 {
@@ -2923,6 +2946,7 @@ void cpu_exec_init_all(void)
      * up front what their requirements are.
      */
     finalize_target_page_bits();
+	
     io_mem_init();
     memory_map_init();
     qemu_mutex_init(&map_client_list_lock);

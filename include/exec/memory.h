@@ -183,6 +183,23 @@ struct MemoryRegionIOMMUOps {
 typedef struct CoalescedMemoryRange CoalescedMemoryRange;
 typedef struct MemoryRegionIoeventfd MemoryRegionIoeventfd;
 
+/* 
+ * 分为RAM，MMIO, ROM, ROM Device,container, alias这些类别的MemoryRegion
+ *
+ * RAM: host上一段实际分配给虚拟机作为物理内存的虚拟内存
+ * MMIO:guest的一段内存,但是宿主机上没有对应的虚拟内存,而是截获对这个区域的访问,调用对应写回调函数
+ * ROM:与RAM类似,只是类型内存只有只读属性,无法写入
+ * ROM Device: 其在读方面类似RAM，能够直接读取，而在写方面类似MMIO,写入会调用对应的写回调函数
+ * container:包含若干个Memory region每一个region在这个container的偏移都不一样,container将多个MemoryRegion合并成一个，
+ *           如PCI的Memory region就会包含RAM和MMIO，一般来说,container和region不会重合，但是也有例外
+ * alias: region的另一个部分,可以使一个region被分成几个不连续的部分io_mem_unassigned
+ *
+ * io_mem_rom, io_mem_unassigned, 
+ * io_mem_notdirty, io_mem_watch
+ * system_memory, system_io 
+ *
+ * MemoryRegion展开后的内存拓扑由FlatRange表示
+ */
 struct MemoryRegion {
     Object parent_obj;
 
@@ -203,11 +220,20 @@ struct MemoryRegion {
 
     const MemoryRegionOps *ops;
     void *opaque;
+	/*
+	 * 表示该MemoryRegion所处的上一级MemoryRegion
+	 */
     MemoryRegion *container;
     Int128 size;
+	/* 
+	 * 表示这段MemoryRegion所在虚拟机的物理地址
+	 */
     hwaddr addr;
     void (*destructor)(MemoryRegion *mr);
     uint64_t align;
+	/*
+	 * 表示MemoryRegion是否是叶子节点
+	 */
     bool terminates;
     bool ram_device;
     bool enabled;
@@ -215,8 +241,19 @@ struct MemoryRegion {
     uint8_t vga_logging_count;
     MemoryRegion *alias;
     hwaddr alias_offset;
+	/*
+	 * 优先级
+	 * 一般情况下,当解析一个地址时，只会落入一个MemoryRegion,但是当MemoryRegion重合时，
+	 * 需要有一种机制决定到底让哪一个VM可见，这就是priority的作用了
+	 */
     int32_t priority;
+	/*
+	 * 表示该MemoryRegion所有的子MemoryRegion
+	 */
     QTAILQ_HEAD(subregions, MemoryRegion) subregions;
+    /*
+     * 链接来自同一个父MemoryRegion下面的兄弟MemoryRegion
+     */
     QTAILQ_ENTRY(MemoryRegion) subregions_link;
     QTAILQ_HEAD(coalesced_ranges, CoalescedMemoryRange) coalesced;
     const char *name;
@@ -231,20 +268,45 @@ struct MemoryRegion {
  *
  * Allows a component to adjust to changes in the guest-visible memory map.
  * Use with memory_listener_register() and memory_listener_unregister().
+ *
+ * 在AddressSpace中有一个dispatch_listener成员
+ *
+ * QEMU需要将虚拟机的物理内存布局通知到KVM
+ * 并且每次变化都需要通知KVM进行相应的修改
+ *
+ * 这些回调函数在kvm_memory_listener_register中被设置
+ *
+ *
  */
 struct MemoryListener {
     void (*begin)(MemoryListener *listener);
+	//执行内存变更时,memory_region_transaction_commit中调用
     void (*commit)(MemoryListener *listener);
+	//kvm_region_add, 在添加region的时候被调用
     void (*region_add)(MemoryListener *listener, MemoryRegionSection *section);
+	//kvm_region_del, address_space_update_topology_pass中调用
     void (*region_del)(MemoryListener *listener, MemoryRegionSection *section);
+	//address_space_update_topology_pass中调用
     void (*region_nop)(MemoryListener *listener, MemoryRegionSection *section);
+	/* 
+	 * log_XXX这类函数跟脏页机制的开启和同步有关系
+	 *
+	 * kvm_log_start
+	 */
     void (*log_start)(MemoryListener *listener, MemoryRegionSection *section,
                       int old, int new);
+	/* 
+	 * kvm_log_stop()
+	 */
     void (*log_stop)(MemoryListener *listener, MemoryRegionSection *section,
                      int old, int new);
+	/*
+	 * kvm_log_sync()
+	 */
     void (*log_sync)(MemoryListener *listener, MemoryRegionSection *section);
     void (*log_global_start)(MemoryListener *listener);
     void (*log_global_stop)(MemoryListener *listener);
+	
     void (*eventfd_add)(MemoryListener *listener, MemoryRegionSection *section,
                         bool match_data, uint64_t data, EventNotifier *e);
     void (*eventfd_del)(MemoryListener *listener, MemoryRegionSection *section,
@@ -255,31 +317,53 @@ struct MemoryListener {
                                hwaddr addr, hwaddr len);
     /* Lower = earlier (during add), later (during del) */
     unsigned priority;
+	//表示本listener监听的AddressSpace这个物理地址空间
     AddressSpace *address_space;
+	//将各个listener链接起来,所有的MemoryListener都链接到memory_listeners上
     QTAILQ_ENTRY(MemoryListener) link;
+	//链接到某个特定的AddressSpace->listeners
     QTAILQ_ENTRY(MemoryListener) link_as;
 };
 
 /**
  * AddressSpace: describes a mapping of addresses to #MemoryRegion objects
+ *
+ * 关注两个全局对象:
+ * address_space_memory
+ * address_space_io
+ *
  */
 struct AddressSpace {
     /* All fields are private. */
     struct rcu_head rcu;
     char *name;
+	//树形结构
     MemoryRegion *root;
     int ref_count;
     bool malloced;
 
-    /* Accessed via RCU.  */
+    /*
+     *　Accessed via RCU.  
+     *
+     * 
+	 */
     struct FlatView *current_map;
 
     int ioeventfd_nb;
     struct MemoryRegionIoeventfd *ioeventfds;
+	
     struct AddressSpaceDispatch *dispatch;
     struct AddressSpaceDispatch *next_dispatch;
+	//在address_space_init_dispatch中初始化
     MemoryListener dispatch_listener;
+	/* 
+	 * 链接MemoryListener->link_as
+	 * 本AddressSpace所有的MemoryListener都这个这个链表上面了
+	 */
     QTAILQ_HEAD(memory_listeners_as, MemoryListener) listeners;
+	/*
+	 * 所有的AddressSpace都链接到address_spaces链表上
+	 */
     QTAILQ_ENTRY(AddressSpace) address_spaces_link;
 };
 

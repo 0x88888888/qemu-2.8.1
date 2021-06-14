@@ -3090,7 +3090,17 @@ int main(int argc, char **argv, char **envp)
     error_set_progname(argv[0]);
     qemu_init_exec_dir(argv[0]);
 
-    //调用init函数(也就是各种register函数)，注册各种TypeInfo对象到type_table[]中去
+    /*
+     * 调用init函数(也就是各种register函数)，注册各种TypeInfo对象到type_table[]中去
+     *
+     * type_init(iothread_register_types)
+     * type_init(register_types)
+     * type_init(vapic_register)
+     * type_init(register_accel_types)
+     * type_init(pci_bridge_dev_register)
+     * type_init(kvm_type_init)
+     * 
+     */
     module_call_init(MODULE_INIT_QOM);
 	
     module_call_init(MODULE_INIT_QAPI);
@@ -3178,6 +3188,7 @@ int main(int argc, char **argv, char **envp)
         }
     }
 
+    //读取 /qemu.conf配置文件
     if (defconfig) {
         int ret;
         ret = qemu_read_default_config_files(userconfig);
@@ -4180,6 +4191,9 @@ int main(int argc, char **argv, char **envp)
         }
     }
 
+    /* 
+     * 初始化address_space_memory,address_space_io,system_io
+     */
     cpu_exec_init_all();
 
     if (machine_class->hw_version) {
@@ -4709,7 +4723,7 @@ int main(int argc, char **argv, char **envp)
 
     /* TODO: once all bus devices are qdevified, this should be done
      * when bus is created by qdev.c */
-    qemu_register_reset(qbus_reset_all_fn, sysbus_get_default());
+    qemu_register_reset(qbus_reset_all_fn, sysbus_get_default() /* 系统总线 */ );
     qemu_run_machine_init_done_notifiers();
 
     if (rom_check_and_register_reset() != 0) {

@@ -77,6 +77,7 @@ static Type type_interface;
 
 static GHashTable *type_table_get(void)
 {
+    //TypeImpl->name作为key, TypeImpl作为value
     static GHashTable *type_table;
 
     if (type_table == NULL) {
@@ -106,6 +107,7 @@ static TypeImpl *type_new(const TypeInfo *info)
 
     g_assert(info->name != NULL);
 
+    //必须确保在type_table中没有name这个TypeImpl
     if (type_table_lookup(info->name) != NULL) {
         fprintf(stderr, "Registering `%s' which already exists\n", info->name);
         abort();
@@ -180,6 +182,9 @@ TypeImpl *type_register_static(const TypeInfo *info)
     return type_register(info);
 }
 
+/*
+ * 用name作为key到type_table中查找
+ */ 
 static TypeImpl *type_get_by_name(const char *name)
 {
     if (name == NULL) {

@@ -22,9 +22,17 @@
 #ifndef CONFIG_USER_ONLY
 #include "hw/xen/xen.h"
 
+/* 
+ * 表示虚拟机中的一段物理内存
+ *
+ * 所有的RAMBlock都链接到ram_list中去
+ */
 struct RAMBlock {
     struct rcu_head rcu;
     struct MemoryRegion *mr;
+	/*
+	 * 表示虚拟机物理内存对应到QEMU进程地址空间的虚拟内存
+	 */
     uint8_t *host;
     ram_addr_t offset;
     ram_addr_t used_length;
@@ -34,6 +42,7 @@ struct RAMBlock {
     /* Protected by iothread lock.  */
     char idstr[256];
     /* RCU-enabled, writes protected by the ramlist lock */
+	//链接到ram_list中去
     QLIST_ENTRY(RAMBlock) next;
     int fd;
     size_t page_size;

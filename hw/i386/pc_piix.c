@@ -125,7 +125,9 @@ static void pc_init1(MachineState *machine,
     if (xen_enabled()) {
         xen_hvm_init(pcms, &ram_memory);
     } else {
+        //4g一下的物理地址作为低端内存
         if (!pcms->max_ram_below_4g) {
+			//这里设置3.5G
             pcms->max_ram_below_4g = 0xe0000000; /* default: 3.5G */
         }
         lowmem = pcms->max_ram_below_4g;

@@ -13,6 +13,15 @@
 #include "sysemu/accel.h"
 #include "sysemu/kvm.h"
 
+/*
+ * QEMU对guest物理内存分段的的描述
+ *
+ * KVMSlot就是建立了GPA到HVA的映射关系
+ *
+ * 在kvm_memory_listener_register中分配
+ *
+ * 在kvm_set_user_memory_region中转成kvm_userspace_memory_region对象
+ */
 typedef struct KVMSlot
 {
     /* 虚机内存区间起始地址（GPA） */
@@ -28,6 +37,11 @@ typedef struct KVMSlot
 
 typedef struct KVMMemoryListener {
     MemoryListener listener;
+	/*
+	 * 一个虚拟机中所有的KVMSlot
+	 *
+	 * kvm_state->nr_slots表示slots数组的数量
+	 */
     KVMSlot *slots;
     int as_id;
 } KVMMemoryListener;
