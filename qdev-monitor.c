@@ -206,6 +206,13 @@ static const char *find_typename_by_alias(const char *alias)
     return NULL;
 }
 
+/*
+ * main() [vl.c]
+ *  ...
+ *   device_init_func()
+ *    qdev_device_add()
+ *     qdev_get_device_class()
+ */
 static DeviceClass *qdev_get_device_class(const char **driver, Error **errp)
 {
     ObjectClass *oc;
@@ -216,7 +223,7 @@ static DeviceClass *qdev_get_device_class(const char **driver, Error **errp)
     if (!oc) {
         const char *typename = find_typename_by_alias(*driver);
 
-        if (typename) {
+        if (typename) {//得到TypeImpl->class
             *driver = typename;
             oc = object_class_by_name(*driver);
         }
@@ -557,6 +564,12 @@ void qdev_set_id(DeviceState *dev, const char *id)
     }
 }
 
+/*
+ * main() [vl.c]
+ *  ...
+ *   device_init_func()
+ *    qdev_device_add()
+ */
 DeviceState *qdev_device_add(QemuOpts *opts, Error **errp)
 {
     DeviceClass *dc;
@@ -572,6 +585,7 @@ DeviceState *qdev_device_add(QemuOpts *opts, Error **errp)
     }
 
     /* find driver */
+	//得到对应的XXXClass对象
     dc = qdev_get_device_class(&driver, errp);
     if (!dc) {
         return NULL;
@@ -603,6 +617,7 @@ DeviceState *qdev_device_add(QemuOpts *opts, Error **errp)
     }
 
     /* create device */
+	//创建device
     dev = DEVICE(object_new(driver));
 
     if (bus) {
@@ -620,6 +635,7 @@ DeviceState *qdev_device_add(QemuOpts *opts, Error **errp)
     }
 
     dev->opts = opts;
+	//设备已经初始化完毕，可以使用了
     object_property_set_bool(OBJECT(dev), true, "realized", &err);
     if (err != NULL) {
         error_propagate(errp, err);

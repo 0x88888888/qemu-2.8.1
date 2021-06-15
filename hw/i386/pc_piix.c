@@ -425,6 +425,7 @@ static void pc_xen_hvm_init(MachineState *machine)
 }
 #endif
 
+//这个很可以
 #define DEFINE_I440FX_MACHINE(suffix, name, compatfn, optionfn) \
     static void pc_init_##suffix(MachineState *machine) \
     { \

@@ -121,6 +121,9 @@ struct MachineClass {
         has_dynamic_sysbus:1,
         pci_allow_0_address:1,
         legacy_fw_cfg_order:1;
+	/*
+	 * 在pc_i440fx_2_8_machine_options中设置为1，其余的为0
+	 */
     int is_default;
     const char *default_machine_opts;
     const char *default_boot_order;

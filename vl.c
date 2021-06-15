@@ -2387,6 +2387,12 @@ static int device_help_func(void *opaque, QemuOpts *opts, Error **errp)
     return qdev_device_help(opts);
 }
 
+/*
+ * main() [vl.c]
+ *  ...
+ *   device_init_func()
+ *
+ */
 static int device_init_func(void *opaque, QemuOpts *opts, Error **errp)
 {
     Error *err = NULL;
@@ -4655,6 +4661,7 @@ int main(int argc, char **argv, char **envp)
 
     /* init generic devices */
     rom_set_order_override(FW_CFG_ORDER_OVERRIDE_DEVICE);
+	
     if (qemu_opts_foreach(qemu_find_opts("device"),
                           device_init_func, NULL, NULL)) {
         exit(1);

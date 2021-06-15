@@ -42,34 +42,61 @@ struct InterfaceImpl
 
 /*
  * 所有的TypeInfo对象都转成TypeImpl存储在静态函数type_table_get(void)函数中定义的静态对象type_table中 
+ *
+ * 1.在调用module_entry->init()==register_xxxx的时候，
+ *   只是初创一个TypeImpl,加到type_table中，
+ *   并且从TypeInfo复制一些信息过来。
+ *
+ * 2.在type_initialize()更具自己来设置一些成员属性，
+ *   初始化parent和interface
+ *
  */
 struct TypeImpl
 {
+    //从TypeInfo->name赋值
     const char *name;
 
+    //从TypeInfo->class_size赋值
     size_t class_size;
 
+	//从TypeInfo->instance_size赋值
     size_t instance_size;
 
+    //从TypeInfo->class_init赋值
     void (*class_init)(ObjectClass *klass, void *data);
+	//从TypeInfo->class_base_init赋值
     void (*class_base_init)(ObjectClass *klass, void *data);
+	//从TypeInfo->class_finalize赋值
     void (*class_finalize)(ObjectClass *klass, void *data);
 
+    //从TypeInfo->class_data赋值
     void *class_data;
 
+    //从TypeInfo->instance_init赋值
     void (*instance_init)(Object *obj);
+	//从TypeInfo->instance_post_init赋值
     void (*instance_post_init)(Object *obj);
+	//从TypeInfo->instance_finalize赋值
     void (*instance_finalize)(Object *obj);
 
-    //如果为1，就不可以实例化出instance来了
+    //如果为1，就不可以实例化出instance来了,从TypeInfo->abstract复制
     bool abstract;
 
+    //从TypeInfo->parent赋值
     const char *parent;
+	//从TypeInfo->name赋值
     TypeImpl *parent_type;
 
+    /*
+     * 在type_initialize中ti->class=g_malloc0(ti->class_size)
+     *
+     * class指向PCIDeviceClass 之类的
+     */
     ObjectClass *class;
 
+    //
     int num_interfaces;
+	//从TypeInfo->interfaces赋值
     InterfaceImpl interfaces[MAX_INTERFACES];
 };
 
@@ -100,6 +127,15 @@ static TypeImpl *type_table_lookup(const char *name)
     return g_hash_table_lookup(type_table_get(), name);
 }
 
+/*
+ * main() [vl.c]
+ *  module_call_init()
+ *   ...
+ *    type_register_static()
+ *     type_register()
+ *      type_register_internal()
+ *       type_new()
+ */
 static TypeImpl *type_new(const TypeInfo *info)
 {
     TypeImpl *ti = g_malloc0(sizeof(*ti));
@@ -139,10 +175,13 @@ static TypeImpl *type_new(const TypeInfo *info)
 }
 
 /*
- * type_init()
- *  e1000_register_types()
- *   type_register()
- *    type_register_internal() 
+ * main() [vl.c]
+ *  module_call_init()
+ *   ...
+ *    type_register_static()
+ *     type_register()
+ *      type_register_internal()
+ *
  */
 static TypeImpl *type_register_internal(const TypeInfo *info)
 {
@@ -157,14 +196,11 @@ static TypeImpl *type_register_internal(const TypeInfo *info)
 /*
  * 将TypeInfo对象转成TypeImpl,存储到type_table中
  *
- * type_init()
- *  e1000_register_types()
- *   type_register()
- *
- * type_init(qdev_register_types)
- *  qdev_register_types()
- *   type_register_static(info == device_type_info)
- *    type_register(info == device_type_info)
+ * main() [vl.c]
+ *  module_call_init()
+ *   ...
+ *    type_register_static()
+ *     type_register()
  */
 TypeImpl *type_register(const TypeInfo *info)
 {
@@ -173,9 +209,10 @@ TypeImpl *type_register(const TypeInfo *info)
 }
 
 /*
- * type_init(qdev_register_types)
- *  qdev_register_types()
- *   type_register_static(info == device_type_info)
+ * main() [vl.c]
+ *  module_call_init()
+ *   ...
+ *    type_register_static()
  */
 TypeImpl *type_register_static(const TypeInfo *info)
 {
@@ -194,10 +231,15 @@ static TypeImpl *type_get_by_name(const char *name)
     return type_table_lookup(name);
 }
 
+/*
+ * 获取type的parent 对象
+ */
 static TypeImpl *type_get_parent(TypeImpl *type)
 {
-    if (!type->parent_type && type->parent) {
+    if (!type->parent_type && type->parent) { //只有parent 的名字，还没有将parent赋值到type->parent_type
+		
         type->parent_type = type_get_by_name(type->parent);
+		
         g_assert(type->parent_type != NULL);
     }
 
@@ -211,30 +253,35 @@ static bool type_has_parent(TypeImpl *type)
 
 static size_t type_class_get_size(TypeImpl *ti)
 {
-    if (ti->class_size) {
+    if (ti->class_size) {//自己有class_size
         return ti->class_size;
     }
 
-    if (type_has_parent(ti)) {
+    if (type_has_parent(ti)) {//如果自己没有class_size,从父类获取
         return type_class_get_size(type_get_parent(ti));
     }
 
+    //如果没有父类,就返回 sizeof(ObjectClass)
     return sizeof(ObjectClass);
 }
 
+/*
+ * 得到到TypeImpl 搞出来的instace 的size大小
+ */
 static size_t type_object_get_size(TypeImpl *ti)
 {
     if (ti->instance_size) {
         return ti->instance_size;
     }
 
-    if (type_has_parent(ti)) {
+    if (type_has_parent(ti)) {//用父类去递归
         return type_object_get_size(type_get_parent(ti));
     }
 
     return 0;
 }
 
+//等同type_object_get_size
 size_t object_type_get_instance_size(const char *typename)
 {
     TypeImpl *type = type_get_by_name(typename);
@@ -243,16 +290,20 @@ size_t object_type_get_instance_size(const char *typename)
     return type_object_get_size(type);
 }
 
+/*
+ * target_type 是否是type的ancestor
+ */
 static bool type_is_ancestor(TypeImpl *type, TypeImpl *target_type)
 {
     assert(target_type);
 
     /* Check if target_type is a direct ancestor of type */
     while (type) {
-        if (type == target_type) {
+        if (type == target_type) {//相等了，找到了，确定了.
             return true;
         }
 
+        //往类型树的parent方向走
         type = type_get_parent(type);
     }
 
@@ -278,6 +329,7 @@ static void type_initialize_interface(TypeImpl *ti, TypeImpl *interface_type,
 
     iface_impl = type_new(&info);
     iface_impl->parent_type = parent_type;
+	
     type_initialize(iface_impl);
     g_free((char *)info.name);
 
@@ -301,9 +353,12 @@ static void object_property_free(gpointer data)
 
 /*
  * main() [vl.c]
- *  object_new(typename==)
- *   object_new_with_type()
- *    type_initialize()
+ *  select_machine()
+ *   find_default_machine()
+ *    object_class_get_list()
+ * 	   object_class_foreach(type_table,object_class_get_list_tramp)
+ *      object_class_foreach_tramp(...)
+ *       type_initialize()
  */
 static void type_initialize(TypeImpl *ti)
 {
@@ -414,6 +469,14 @@ static void object_post_init_with_type(Object *obj, TypeImpl *ti)
 /*
  * object_initialize()
  *  object_initialize_with_type()
+ *
+ * main() [vl.c]
+ *  ...
+ *   device_init_func()
+ *    qdev_device_add()
+ *     object_new()
+ *      object_new_with_type()
+ *       object_initialize_with_type()
  */
 void object_initialize_with_type(void *data, size_t size, TypeImpl *type)
 {
@@ -427,6 +490,7 @@ void object_initialize_with_type(void *data, size_t size, TypeImpl *type)
     g_assert_cmpint(size, >=, type->instance_size);
 
     memset(obj, 0, type->instance_size);
+	//具体PCIDeviceClass
     obj->class = type->class;
     object_ref(obj);
     obj->properties = g_hash_table_new_full(g_str_hash, g_str_equal,
@@ -535,6 +599,13 @@ static void object_finalize(void *data)
  * main() [vl.c]
  *  object_new(typename==)
  *   object_new_with_type()
+ *
+ * main() [vl.c]
+ *  ...
+ *   device_init_func()
+ *    qdev_device_add()
+ *     object_new()
+ *      object_new_with_type()
  */
 Object *object_new_with_type(Type type)
 {
@@ -543,7 +614,9 @@ Object *object_new_with_type(Type type)
     g_assert(type != NULL);
     type_initialize(type);
 
+    //给instance分配内存
     obj = g_malloc(type->instance_size);
+	
     object_initialize_with_type(obj, type->instance_size, type);
     obj->free = g_free;
 
@@ -552,7 +625,10 @@ Object *object_new_with_type(Type type)
 
 /*
  * main() [vl.c]
- *  object_new(typename==)
+ *  ...
+ *   device_init_func()
+ *    qdev_device_add()
+ *     object_new()
  */
 Object *object_new(const char *typename)
 {
@@ -813,6 +889,9 @@ const char *object_get_typename(Object *obj)
     return obj->class->type->name;
 }
 
+/*
+ * 这个函数是链接XXXClass和XXXXState的纽带
+ */
 ObjectClass *object_get_class(Object *obj)
 {
     return obj->class;
@@ -862,6 +941,14 @@ typedef struct OCFData
     void *opaque;
 } OCFData;
 
+/*
+ * main() [vl.c]
+ *  select_machine()
+ *   find_default_machine()
+ *    object_class_get_list()
+ * 	   object_class_foreach(type_table,object_class_get_list_tramp)
+ *      object_class_foreach_tramp(...)
+ */
 static void object_class_foreach_tramp(gpointer key, gpointer value,
                                        gpointer opaque)
 {
@@ -869,6 +956,7 @@ static void object_class_foreach_tramp(gpointer key, gpointer value,
     TypeImpl *type = value;
     ObjectClass *k;
 
+    //
     type_initialize(type);
     k = type->class;
 
@@ -884,6 +972,13 @@ static void object_class_foreach_tramp(gpointer key, gpointer value,
     data->fn(k, data->opaque);
 }
 
+/*
+ * main() [vl.c]
+ *  select_machine()
+ *   find_default_machine()
+ *    object_class_get_list()
+ *     object_class_foreach(object_class_get_list_tramp)
+ */
 void object_class_foreach(void (*fn)(ObjectClass *klass, void *opaque),
                           const char *implements_type, bool include_abstract,
                           void *opaque)
@@ -891,6 +986,7 @@ void object_class_foreach(void (*fn)(ObjectClass *klass, void *opaque),
     OCFData data = { fn, implements_type, include_abstract, opaque };
 
     enumerating_types = true;
+	
     g_hash_table_foreach(type_table_get(), object_class_foreach_tramp, &data);
     enumerating_types = false;
 }
@@ -940,6 +1036,12 @@ static void object_class_get_list_tramp(ObjectClass *klass, void *opaque)
     *list = g_slist_prepend(*list, klass);
 }
 
+/*
+ * main() [vl.c]
+ *  select_machine()
+ *   find_default_machine()
+ *    object_class_get_list()
+ */
 GSList *object_class_get_list(const char *implements_type,
                               bool include_abstract)
 {

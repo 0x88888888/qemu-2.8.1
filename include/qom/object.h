@@ -395,6 +395,7 @@ struct ObjectClass
 struct Object
 {
     /*< private >*/
+    //具体的PCIDeviceClass
     ObjectClass *class;
     ObjectFree *free;
     GHashTable *properties;

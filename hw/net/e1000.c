@@ -1719,6 +1719,7 @@ static void e1000_register_types(void)
     type_register_static(&e1000_base_info);
     for (i = 0; i < ARRAY_SIZE(e1000_devices); i++) {
         const E1000Info *info = &e1000_devices[i];
+		//根据这个临时type_info去创建typeimpl对象
         TypeInfo type_info = {};
 
         type_info.name = info->name;
