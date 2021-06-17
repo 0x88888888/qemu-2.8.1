@@ -100,6 +100,8 @@ typedef uint32_t MemTxResult;
 
 /*
  * Memory region callbacks
+ *
+ * 看edu_mmio_ops对象
  */
 struct MemoryRegionOps {
     /* Read from the memory region. @addr is relative to @mr; @size is

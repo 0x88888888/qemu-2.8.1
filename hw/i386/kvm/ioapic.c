@@ -17,7 +17,15 @@
 #include "hw/i386/apic_internal.h"
 #include "sysemu/kvm.h"
 
-/* PC Utility function */
+/*
+ * main()
+ *  DEFINE_I440FX_MACHINE 定于出来的函数pc_init_##suffix()调用
+ *   pc_init1(host_type=TYPE_I440FX_PCI_HOST_BRIDGE,
+              pci_type=TYPE_I440FX_PCI_DEVICE)
+ *    kvm_pc_setup_irq_routing()
+ *
+ * PC Utility function 
+ */
 void kvm_pc_setup_irq_routing(bool pci_enabled)
 {
     KVMState *s = kvm_state;
@@ -33,6 +41,7 @@ void kvm_pc_setup_irq_routing(bool pci_enabled)
         for (i = 8; i < 16; ++i) {
             kvm_irqchip_add_irq_route(s, i, KVM_IRQCHIP_PIC_SLAVE, i - 8);
         }
+		
         if (pci_enabled) {
             for (i = 0; i < 24; ++i) {
                 if (i == 0) {
@@ -134,7 +143,9 @@ static void kvm_ioapic_set_irq(void *opaque, int irq, int level)
     KVMIOAPICState *s = opaque;
     int delivered;
 
+    //通过内核的KVM将中断通知到guest os
     delivered = kvm_set_irq(kvm_state, s->kvm_gsi_base + irq, level);
+	
     apic_report_irq_delivered(delivered);
 }
 

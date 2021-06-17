@@ -74,6 +74,15 @@ int qbus_walk_children(BusState *bus,
     return 0;
 }
 
+/*
+ * DEFINE_I440FX_MACHINE 定于出来的函数pc_init_##suffix()调用
+ *  pc_init1()
+ *   i440fx_init()
+ *    pci_bus_new()
+ *     qbus_create()
+ *      qbus_realize()
+ * 
+ */
 static void qbus_realize(BusState *bus, DeviceState *parent, const char *name)
 {
     const char *typename = object_get_typename(OBJECT(bus));
@@ -82,13 +91,14 @@ static void qbus_realize(BusState *bus, DeviceState *parent, const char *name)
 
     bus->parent = parent;
 
-    if (name) {
+    
+    if (name) {//如果指定了总线的名称
         bus->name = g_strdup(name);
-    } else if (bus->parent && bus->parent->id) {
+    } else if (bus->parent && bus->parent->id) {//根据总线所在的父设备,得到名称
         /* parent device has id -> use it plus parent-bus-id for bus name */
         bus_id = bus->parent->num_child_bus;
         bus->name = g_strdup_printf("%s.%d", bus->parent->id, bus_id);
-    } else {
+    } else { //父设备也没有id
         /* no id -> use lowercase bus type plus global bus-id for bus name */
         bc = BUS_GET_CLASS(bus);
         bus_id = bc->automatic_ids++;
@@ -98,7 +108,7 @@ static void qbus_realize(BusState *bus, DeviceState *parent, const char *name)
         }
     }
 
-    if (bus->parent) {
+    if (bus->parent) {//将总线挂到父设备的bus->parent->child_bus
         QLIST_INSERT_HEAD(&bus->parent->child_bus, bus, sibling);
         bus->parent->num_child_bus++;
         object_property_add_child(OBJECT(bus->parent), bus->name, OBJECT(bus), NULL);
@@ -129,6 +139,13 @@ static void bus_unparent(Object *obj)
     }
 }
 
+/*
+ * main() [vl.c]
+ *  sysbus_get_default()
+ *   main_system_bus_create()
+ *    qbus_create_inplace(bus=main_system_bus,typename=TYPE_SYSTEM_BUS,name="main-system-bus")
+ * 创建系统总线
+ */
 void qbus_create_inplace(void *bus, size_t size, const char *typename,
                          DeviceState *parent, const char *name)
 {
@@ -136,11 +153,21 @@ void qbus_create_inplace(void *bus, size_t size, const char *typename,
     qbus_realize(bus, parent, name);
 }
 
+/*
+ * DEFINE_I440FX_MACHINE 定于出来的函数pc_init_##suffix()调用
+ *  pc_init1()
+ *   i440fx_init()
+ *    pci_bus_new()
+ *     qbus_create()
+ *
+ * 创建总线
+ */
 BusState *qbus_create(const char *typename, DeviceState *parent, const char *name)
 {
     BusState *bus;
 
     bus = BUS(object_new(typename));
+	//只是对bus做一些基本的设置
     qbus_realize(bus, parent, name);
 
     return bus;
@@ -166,7 +193,7 @@ static void bus_set_realized(Object *obj, bool value, Error **errp)
         }
 
         /* TODO: recursive realization */
-    } else if (!value && bus->realized) {
+    } else if (!value && bus->realized) {//去调用unrealize
         QTAILQ_FOREACH(kid, &bus->children, sibling) {
             DeviceState *dev = kid->child;
             object_property_set_bool(OBJECT(dev), false, "realized",

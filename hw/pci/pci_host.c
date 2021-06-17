@@ -119,6 +119,7 @@ uint32_t pci_data_read(PCIBus *s, uint32_t addr, int len)
     return val;
 }
 
+//设置配置寄存器
 static void pci_host_config_write(void *opaque, hwaddr addr,
                                   uint64_t val, unsigned len)
 {

@@ -565,10 +565,14 @@ void qdev_set_id(DeviceState *dev, const char *id)
 }
 
 /*
- * main() [vl.c]
- *  ...
- *   device_init_func()
+ * qmp_init_marshal() 将hmp_device_add添加为qmp命令
+ *  hmp_device_add()
+ *   qmp_device_add()
  *    qdev_device_add()
+ *
+ * qdev_create创建设备,在随主板初始化的时候一起创建，如南北桥，一些传统的ISA设备、默认的显卡设备等
+ * qdev_device_add创建设备，在QEMU monitor中通过device_add添加的设备
+ *   
  */
 DeviceState *qdev_device_add(QemuOpts *opts, Error **errp)
 {
@@ -798,6 +802,11 @@ void hmp_info_qom_tree(Monitor *mon, const QDict *dict)
     print_qom_composition(mon, obj, 0);
 }
 
+/*
+ * qmp_init_marshal() 将hmp_device_add添加为qmp命令
+ *  hmp_device_add()
+ *   qmp_device_add()
+ */
 void qmp_device_add(QDict *qdict, QObject **ret_data, Error **errp)
 {
     Error *local_err = NULL;
@@ -813,6 +822,7 @@ void qmp_device_add(QDict *qdict, QObject **ret_data, Error **errp)
         qemu_opts_del(opts);
         return;
     }
+	//添加设备
     dev = qdev_device_add(opts, &local_err);
     if (!dev) {
         error_propagate(errp, local_err);

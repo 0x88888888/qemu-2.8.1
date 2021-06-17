@@ -62,7 +62,7 @@ static AccelClass *accel_find(const char *opt_name)
 /*
  * main() [vl.c]
  *  configure_accelerator()
- *
+ *   accel_init_machine()
  */
 static int accel_init_machine(AccelClass *acc, MachineState *ms)
 {
@@ -119,6 +119,7 @@ void configure_accelerator(MachineState *ms)
                    acc->name);
             continue;
         }
+		//去调用kvm_init
         ret = accel_init_machine(acc, ms);
         if (ret < 0) {
             init_failed = true;

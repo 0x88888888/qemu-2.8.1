@@ -517,6 +517,13 @@ inc_tx_bcast_or_mcast_count(E1000State *s, const unsigned char *arr)
     }
 }
 
+/*
+ * set_tctl()
+ *  start_xmit()
+ *   process_tx_desc()
+ *    xmit_seg()
+ *     e1000_send_packet()
+ */
 static void
 e1000_send_packet(E1000State *s, const uint8_t *buf, int size)
 {
@@ -524,15 +531,22 @@ e1000_send_packet(E1000State *s, const uint8_t *buf, int size)
                                     PTC1023, PTC1522 };
 
     NetClientState *nc = qemu_get_queue(s->nic);
-    if (s->phy_reg[PHY_CTRL] & MII_CR_LOOPBACK) {
+    if (s->phy_reg[PHY_CTRL] & MII_CR_LOOPBACK) { //配置了loopback模式
+		
         nc->info->receive(nc, buf, size);
-    } else {
+    } else { //走这里
         qemu_send_packet(nc, buf, size);
     }
     inc_tx_bcast_or_mcast_count(s, buf);
     e1000x_increase_size_stats(s->mac_reg, PTCregs, size);
 }
 
+/*
+ * set_tctl()
+ *  start_xmit()
+ *   process_tx_desc()
+ *    xmit_seg()
+ */
 static void
 xmit_seg(E1000State *s)
 {
@@ -584,6 +598,7 @@ xmit_seg(E1000State *s)
         putsum(tp->data, tp->size, tp->props.ipcso,
                tp->props.ipcss, tp->props.ipcse);
     }
+	//发送
     if (tp->vlan_needed) {
         memmove(tp->vlan, tp->data, 4);
         memmove(tp->data, tp->data + 4, 8);
@@ -600,6 +615,11 @@ xmit_seg(E1000State *s)
     s->mac_reg[GOTCH] = s->mac_reg[TOTH];
 }
 
+/*
+ * set_tctl()
+ *  start_xmit()
+ *   process_tx_desc()
+ */
 static void
 process_tx_desc(E1000State *s, struct e1000_tx_desc *dp)
 {
@@ -677,6 +697,7 @@ process_tx_desc(E1000State *s, struct e1000_tx_desc *dp)
     if (!(txd_lower & E1000_TXD_CMD_EOP))
         return;
     if (!(tp->props.tse && tp->props.cptse && tp->size < tp->props.hdr_len)) {
+		//发送
         xmit_seg(s);
     }
     tp->tso_frames = 0;
@@ -710,6 +731,10 @@ static uint64_t tx_desc_base(E1000State *s)
     return (bah << 32) + bal;
 }
 
+/*
+ * set_tctl()
+ *  start_xmit()
+ */
 static void
 start_xmit(E1000State *s)
 {
@@ -732,6 +757,7 @@ start_xmit(E1000State *s)
                (void *)(intptr_t)desc.buffer_addr, desc.lower.data,
                desc.upper.data);
 
+        //走起
         process_tx_desc(s, &desc);
         cause |= txdesc_writeback(s, base, &desc);
 
@@ -1091,6 +1117,7 @@ set_tctl(E1000State *s, int index, uint32_t val)
 {
     s->mac_reg[index] = val;
     s->mac_reg[TDT] &= 0xffff;
+	//发送数据包
     start_xmit(s);
 }
 
@@ -1591,13 +1618,16 @@ static void pci_e1000_realize(PCIDevice *pci_dev, Error **errp)
     uint8_t *pci_conf;
     uint8_t *macaddr;
 
+    
     pci_dev->config_write = e1000_write_config;
 
+    //配置空间地址
     pci_conf = pci_dev->config;
 
     /* TODO: RST# value should be 0, PCI spec 6.2.4 */
     pci_conf[PCI_CACHE_LINE_SIZE] = 0x10;
 
+    //确定使用哪一个pin脚用来中断控制器的中断线关联
     pci_conf[PCI_INTERRUPT_PIN] = 1; /* interrupt pin A */
 
     e1000_mmio_setup(d);

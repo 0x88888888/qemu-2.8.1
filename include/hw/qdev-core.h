@@ -90,15 +90,28 @@ struct VMStateDescription;
  * respective parent types.
  *   </para>
  * </note>
+ *
+ * 
+ * 所有设备类的积累
  */
 typedef struct DeviceClass {
     /*< private >*/
     ObjectClass parent_class;
     /*< public >*/
 
+    /*
+     * 设备的种类,DEVICE_CATEGORY_USB,DEVICE_CATEGORY_NETWORK,DEVICE_CATEGORY_NETWORK
+     */
     DECLARE_BITMAP(categories, DEVICE_CATEGORY_MAX);
+	/*
+	 * 通常用于生产设备在固件中的路径
+	 */
     const char *fw_name;
+	/*
+	 * 用于描述设备
+	 */
     const char *desc;
+	//表示设备的属性
     Property *props;
 
     /*
@@ -125,6 +138,9 @@ typedef struct DeviceClass {
      */
     bool cannot_destroy_with_object_finalize_yet;
 
+    /*
+     * 设备是否能进行hot plug
+     */
     bool hotpluggable;
 
     /* callbacks */
@@ -132,12 +148,16 @@ typedef struct DeviceClass {
     DeviceRealize realize;
     DeviceUnrealize unrealize;
 
-    /* device state */
+    /* device state 
+     * 表示设备的状态，在虚拟机migrate的时候,需要记录设备的状态
+     * 以便在目的主机上恢复虚拟机
+	 */
     const struct VMStateDescription *vmsd;
 
     /* Private to qdev / bus.  */
     qdev_initfn init; /* TODO remove, once users are converted to realize */
     qdev_event exit; /* TODO remove, once users are converted to unrealize */
+	//该设备挂载的总线类型
     const char *bus_type;
 } DeviceClass;
 
@@ -163,16 +183,37 @@ struct DeviceState {
     Object parent_obj;
     /*< public >*/
 
+    /*
+     * 设备名称
+     */
     const char *id;
+	/*
+	 * 是否已经具现化
+	 */
     bool realized;
+	/*
+	 * 设备实例销毁的时候判断是否已经具现化，如果已经具现化,就发送一个DEVICE_DELETED事件
+	 */
     bool pending_deleted_event;
+	//设备对应的参数
     QemuOpts *opts;
+	//设备是否是通过热插拔进入到系统的
     int hotplugged;
+	//设备所挂载在的总线
     BusState *parent_bus;
+	/*
+	 * 表示General purpose input/output,相当于设备的输入和输出,用来模拟硬件的pin
+	 */
     QLIST_HEAD(, NamedGPIOList) gpios;
+	/* 
+	 * 链接该设备下所有的总线
+     */
     QLIST_HEAD(, BusState) child_bus;
+	//总线的序号
     int num_child_bus;
+	//migrate的时候保存当前虚拟机的实例的编号
     int instance_id_alias;
+	//migrate时,只有当这个设备的这个值大于或等于设备VMStateDescription->minimum_version_id
     int alias_required_for_version;
 };
 
@@ -187,25 +228,41 @@ struct DeviceListener {
 #define BUS_CLASS(klass) OBJECT_CLASS_CHECK(BusClass, (klass), TYPE_BUS)
 #define BUS_GET_CLASS(obj) OBJECT_GET_CLASS(BusClass, (obj), TYPE_BUS)
 
+/*
+ * 所有总线的基类
+ * 对应的对象为BusState
+ */
 struct BusClass {
     ObjectClass parent_class;
 
     /* FIXME first arg should be BusState */
+	/*
+	 * 打印总线上的一个设备
+	 */
     void (*print_dev)(Monitor *mon, DeviceState *dev, int indent);
     char *(*get_dev_path)(DeviceState *dev);
     /*
      * This callback is used to create Open Firmware device path in accordance
      * with OF spec http://forthworks.com/standards/of1275.pdf. Individual bus
      * bindings can be found at http://playground.sun.com/1275/bindings/.
+     *
+     * 得到设备路径以及在firmware中的路径
      */
     char *(*get_fw_dev_path)(DeviceState *dev);
+	/*
+	 * 是表示Bus进行realize的回调函数
+	 */
     void (*reset)(BusState *bus);
     BusRealize realize;
     BusUnrealize unrealize;
 
-    /* maximum devices allowed on the bus, 0: no limit. */
+    /* maximum devices allowed on the bus, 0: no limit. 
+     * 该bus上允许的最大设备
+	 */
     int max_dev;
-    /* number of automatically allocated bus ids (e.g. ide.0) */
+    /* number of automatically allocated bus ids (e.g. ide.0)
+     * 自动生成的bus id序列号
+     */
     int automatic_ids;
 };
 
@@ -222,14 +279,28 @@ typedef struct BusChild {
  * @hotplug_device: link to a hotplug device associated with bus.
  */
 struct BusState {
+ 
     Object obj;
+	/*
+	 * 表示总线所在的设备
+	 */
     DeviceState *parent;
     char *name;
+	/*
+	 * 处理热插拔
+	 */
     HotplugHandler *hotplug_handler;
+	/*
+	 * 表示该总线最大的设备数量
+	 */
     int max_index;
     bool realized;
+	
     QTAILQ_HEAD(ChildrenHead, BusChild) children;
-    QLIST_ENTRY(BusState) sibling;
+    /*
+     * 链接在一条总线上的设备
+     */
+	QLIST_ENTRY(BusState) sibling;
 };
 
 struct Property {

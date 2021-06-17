@@ -259,13 +259,19 @@ struct PCIDevice {
     uint8_t *config;
 
     /* Used to enable config checks on load. Note that writable bits are
-     * never checked even if set in cmask. */
+     * never checked even if set in cmask. 
+     * 用来检查相关capability
+     */
     uint8_t *cmask;
 
-    /* Used to implement R/W bytes */
+    /* Used to implement R/W bytes 
+     *用来控制读写
+	 */
     uint8_t *wmask;
 
-    /* Used to implement RW1C(Write 1 to Clear) bytes */
+    /* Used to implement RW1C(Write 1 to Clear) bytes 
+     *用来实现RW1C
+	 */
     uint8_t *w1cmask;
 
     /* Used to allocate config space for capabilities. */
@@ -284,8 +290,13 @@ struct PCIDevice {
     AddressSpace bus_master_as;
     MemoryRegion bus_master_enable_region;
 
-    /* do not access the following fields */
+    /* do not access the following fields 
+     * 默认值为pci_default_read_config
+	 */
     PCIConfigReadFunc *config_read;
+	/*
+	 * 默认值为pci_default_write_config
+	 */
     PCIConfigWriteFunc *config_write;
 
     /* Legacy PCI VGA regions */
@@ -541,6 +552,9 @@ pci_config_set_prog_interface(uint8_t *pci_config, uint8_t val)
     pci_set_byte(&pci_config[PCI_CLASS_PROG], val);
 }
 
+/*
+ * 设置pci设备空间的PCI_INTERRUPT_PIN
+ */
 static inline void
 pci_config_set_interrupt_pin(uint8_t *pci_config, uint8_t val)
 {

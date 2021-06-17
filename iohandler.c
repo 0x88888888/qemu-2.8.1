@@ -56,12 +56,27 @@ GSource *iohandler_get_g_source(void)
     return aio_get_g_source(iohandler_ctx);
 }
 
+/*
+ * main() [vl.c]
+ *  net_init_clients() 
+ *   net_init_client() 处理-net参数
+ *    net_client_init()
+ *     net_client_init1()
+ *      net_init_tap()
+ *       net_init_tap()
+ *        net_init_tap_one(name="tap")
+ *         net_tap_fd_init()
+ *          tap_read_poll(enable=true) 
+ *           tap_update_fd_handler(s->enable==true)
+ *            qemu_set_fd_handler(fd_read==tap_send, fd_write==tap_writable)
+ */
 void qemu_set_fd_handler(int fd,
                          IOHandler *fd_read,
                          IOHandler *fd_write,
                          void *opaque)
 {
-    iohandler_init();
+    iohandler_init();//创建iohandler_ctx
+    
     aio_set_fd_handler(iohandler_ctx, fd, false,
                        fd_read, fd_write, opaque);
 }

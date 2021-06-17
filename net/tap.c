@@ -67,6 +67,19 @@ static void launch_script(const char *setup_script, const char *ifname,
 static void tap_send(void *opaque);
 static void tap_writable(void *opaque);
 
+/*
+ * main() [vl.c]
+ *  net_init_clients() 
+ *   net_init_client() 处理-net参数
+ *    net_client_init()
+ *     net_client_init1()
+ *      net_init_tap()
+ *       net_init_tap()
+ *        net_init_tap_one(name="tap")
+ *         net_tap_fd_init()
+ *          tap_read_poll(enable=true) 
+ *           tap_update_fd_handler(s->enable==true)
+ */
 static void tap_update_fd_handler(TAPState *s)
 {
     qemu_set_fd_handler(s->fd,
@@ -75,6 +88,18 @@ static void tap_update_fd_handler(TAPState *s)
                         s);
 }
 
+/*
+ * main() [vl.c]
+ *  net_init_clients() 
+ *   net_init_client() 处理-net参数
+ *    net_client_init()
+ *     net_client_init1()
+ *      net_init_tap()
+ *       net_init_tap()
+ *        net_init_tap_one(name="tap")
+ *         net_tap_fd_init()
+ *          tap_read_poll(enable=true) 
+ */
 static void tap_read_poll(TAPState *s, bool enable)
 {
     s->read_poll = enable;
@@ -96,11 +121,27 @@ static void tap_writable(void *opaque)
     qemu_flush_queued_packets(&s->nc);
 }
 
+/*
+* set_tctl()
+*  start_xmit()
+*   process_tx_desc()
+*	xmit_seg()
+*	 e1000_send_packet()
+*	  qemu_send_packet()
+*	   qemu_send_packet_async()
+*		qemu_send_packet_async_with_flags()
+*		 qemu_net_queue_send()
+*		  qemu_net_queue_deliver()
+*          qemu_deliver_packet_iov()
+*           tap_receive_iov()
+*            tap_write_packet()
+*/
 static ssize_t tap_write_packet(TAPState *s, const struct iovec *iov, int iovcnt)
 {
     ssize_t len;
 
     do {
+		//走向glibc啦，发送内核态的tap设备，然后内核的br0,转给物理网卡，发送出去
         len = writev(s->fd, iov, iovcnt);
     } while (len == -1 && errno == EINTR);
 
@@ -112,6 +153,20 @@ static ssize_t tap_write_packet(TAPState *s, const struct iovec *iov, int iovcnt
     return len;
 }
 
+/*
+* set_tctl()
+*  start_xmit()
+*   process_tx_desc()
+*	xmit_seg()
+*	 e1000_send_packet()
+*	  qemu_send_packet()
+*	   qemu_send_packet_async()
+*		qemu_send_packet_async_with_flags()
+*		 qemu_net_queue_send()
+*		  qemu_net_queue_deliver()
+*          qemu_deliver_packet_iov()
+*           tap_receive_iov()
+*/
 static ssize_t tap_receive_iov(NetClientState *nc, const struct iovec *iov,
                                int iovcnt)
 {
@@ -167,6 +222,10 @@ static ssize_t tap_receive(NetClientState *nc, const uint8_t *buf, size_t size)
 }
 
 #ifndef __sun__
+/*
+ * tap_send()
+ *  tap_read_packet()
+ */
 ssize_t tap_read_packet(int tapfd, uint8_t *buf, int maxlen)
 {
     return read(tapfd, buf, maxlen);
@@ -188,6 +247,7 @@ static void tap_send(void *opaque)
     while (true) {
         uint8_t *buf = s->buf;
 
+        //从内核的tap设备中去读取数据过来
         size = tap_read_packet(s->fd, s->buf, sizeof(s->buf));
         if (size <= 0) {
             break;
@@ -198,6 +258,7 @@ static void tap_send(void *opaque)
             size -= s->host_vnet_hdr_len;
         }
 
+        //将读取过来的数据转给vm中的
         size = qemu_send_packet_async(&s->nc, buf, size, tap_send_completed);
         if (size == 0) {
             tap_read_poll(s, false);
@@ -361,6 +422,17 @@ static NetClientInfo net_tap_info = {
     .set_vnet_be = tap_set_vnet_be,
 };
 
+/*
+ * main() [vl.c]
+ *  net_init_clients() 
+ *   net_init_client() 处理-net参数
+ *    net_client_init()
+ *     net_client_init1()
+ *      net_init_tap()
+ *       net_init_tap()
+ *        net_init_tap_one(name="tap")
+ *         net_tap_fd_init()
+ */
 static TAPState *net_tap_fd_init(NetClientState *peer,
                                  const char *model,
                                  const char *name,
@@ -370,6 +442,7 @@ static TAPState *net_tap_fd_init(NetClientState *peer,
     NetClientState *nc;
     TAPState *s;
 
+    //创建NetClientState
     nc = qemu_new_net_client(&net_tap_info, peer, model, name);
 
     s = DO_UPCAST(TAPState, nc, nc);
@@ -390,6 +463,7 @@ static TAPState *net_tap_fd_init(NetClientState *peer,
     tap_read_poll(s, true);
     s->vhost_net = NULL;
 
+   
     s->exit.notify = tap_exit_notify;
     qemu_add_exit_notifier(&s->exit);
 
@@ -601,6 +675,15 @@ int net_init_bridge(const Netdev *netdev, const char *name,
     return 0;
 }
 
+/*
+ * main() [vl.c]
+ *	net_init_clients() 
+ *	 net_init_client() 处理-net参数
+ *	  net_client_init()
+ *	   net_client_init1()
+ *		net_init_tap()
+ *       net_tap_init()
+ */
 static int net_tap_init(const NetdevTapOptions *tap, int *vnet_hdr,
                         const char *setup_script, char *ifname,
                         size_t ifname_sz, int mq_required, Error **errp)
@@ -616,6 +699,7 @@ static int net_tap_init(const NetdevTapOptions *tap, int *vnet_hdr,
         vnet_hdr_required = 0;
     }
 
+    // /dev/net/tap 的文件描述符
     TFR(fd = tap_open(ifname, ifname_sz, vnet_hdr, vnet_hdr_required,
                       mq_required, errp));
     if (fd < 0) {
@@ -638,6 +722,16 @@ static int net_tap_init(const NetdevTapOptions *tap, int *vnet_hdr,
 
 #define MAX_TAP_QUEUES 1024
 
+/*
+ * main() [vl.c]
+ *  net_init_clients() 
+ *   net_init_client() 处理-net参数
+ *    net_client_init()
+ *     net_client_init1()
+ *      net_init_tap()
+ *       net_init_tap()
+ *        net_init_tap_one(name="tap")
+ */
 static void net_init_tap_one(const NetdevTapOptions *tap, NetClientState *peer,
                              const char *model, const char *name,
                              const char *ifname, const char *script,
@@ -648,6 +742,7 @@ static void net_init_tap_one(const NetdevTapOptions *tap, NetClientState *peer,
     TAPState *s = net_tap_fd_init(peer, model, name, fd, vnet_hdr);
     int vhostfd;
 
+    //设置tap设备的发送包空间大小
     tap_set_sndbuf(s->fd, tap, &err);
     if (err) {
         error_propagate(errp, err);
@@ -736,6 +831,15 @@ static int get_fds(char *str, char *fds[], int max)
     return i;
 }
 
+/*
+ * main() [vl.c]
+ *  net_init_clients() 
+ *   net_init_client() 处理-net参数
+ *    net_client_init()
+ *     net_client_init1()
+ *      net_init_tap()
+ *       net_init_tap()
+ */
 int net_init_tap(const Netdev *netdev, const char *name,
                  NetClientState *peer, Error **errp)
 {
@@ -749,6 +853,7 @@ int net_init_tap(const Netdev *netdev, const char *name,
     char ifname[128];
 
     assert(netdev->type == NET_CLIENT_DRIVER_TAP);
+	//得到NetdevTapOptions对象先,下面根据指定tap设备的方式初始化tap
     tap = &netdev->u.tap;
     queues = tap->has_queues ? tap->queues : 1;
     vhostfdname = tap->has_vhostfd ? tap->vhostfd : NULL;
@@ -760,7 +865,7 @@ int net_init_tap(const Netdev *netdev, const char *name,
         return -1;
     }
 
-    if (tap->has_fd) {
+    if (tap->has_fd) { //通过fd的方式指定tap
         if (tap->has_ifname || tap->has_script || tap->has_downscript ||
             tap->has_vnet_hdr || tap->has_helper || tap->has_queues ||
             tap->has_fds || tap->has_vhostfds) {
@@ -876,7 +981,7 @@ free_fail:
             close(fd);
             return -1;
         }
-    } else {
+    } else { //通过命令的方式指定tap
         if (tap->has_vhostfds) {
             error_setg(errp, "vhostfds= is invalid if fds= wasn't specified");
             return -1;

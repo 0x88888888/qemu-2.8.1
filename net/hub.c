@@ -139,6 +139,24 @@ static NetClientInfo net_hub_port_info = {
     .cleanup = net_hub_port_cleanup,
 };
 
+/**
+ * main() [vl.c]
+ *  net_init_clients()
+ *   net_init_netdev() 处理 -netdev参数
+ *    net_client_init()
+ * 	   net_client_init1()
+ *      net_hub_add_port()
+ *       net_hub_port_new()
+ * 
+ * main() [vl.c]
+ *  net_init_clients() 
+ *   net_init_client() 处理-net参数
+ *    net_client_init()
+ * 	   net_client_init1()
+ *      net_hub_add_port()
+ *       net_hub_port_new()
+ *
+ */
 static NetHubPort *net_hub_port_new(NetHub *hub, const char *name)
 {
     NetClientState *nc;
@@ -163,6 +181,22 @@ static NetHubPort *net_hub_port_new(NetHub *hub, const char *name)
 }
 
 /**
+ * main() [vl.c]
+ *  net_init_clients()
+ *   net_init_netdev() 处理 -netdev参数
+ *    net_client_init()
+ * 	   net_client_init1()
+ *      net_hub_add_port()
+ * 
+ * main() [vl.c]
+ *  net_init_clients() 
+ *   net_init_client() 处理-net参数
+ *    net_client_init()
+ * 	   net_client_init1()
+ *      net_hub_add_port()
+ *
+ * 
+ *
  * Create a port on a given hub
  * @name: Net client name or NULL for default name.
  *

@@ -181,6 +181,8 @@ bool msi_enabled(const PCIDevice *dev)
  * -EINVAL means capability overlap, happens when @offset is non-zero,
  *  also means a programming error, except device assignment, which can check
  *  if a real HW is broken.
+ *
+ * PCI空间中设置与msi相关的数据
  */
 int msi_init(struct PCIDevice *dev, uint8_t offset,
              unsigned int nr_vectors, bool msi64bit,

@@ -72,6 +72,7 @@ struct pci_bus {
     struct pci_device *bus_dev;
 };
 
+//得到第region_num个base address register的偏移
 static u32 pci_bar(struct pci_device *pci, int region_num)
 {
     if (region_num != PCI_ROM_SLOT) {

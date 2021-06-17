@@ -236,6 +236,11 @@ static void qemu_net_client_destructor(NetClientState *nc)
     g_free(nc);
 }
 
+/*
+ * pci_e1000_realize()
+ *  qemu_new_nic()
+ *   qemu_net_client_setup()
+ */
 static void qemu_net_client_setup(NetClientState *nc,
                                   NetClientInfo *info,
                                   NetClientState *peer,
@@ -256,8 +261,11 @@ static void qemu_net_client_setup(NetClientState *nc,
         nc->peer = peer;
         peer->peer = nc;
     }
+	
     QTAILQ_INSERT_TAIL(&net_clients, nc, next);
 
+
+    //创建一个NetQueue, queue->deliver=qemu_deliver_packet_iov
     nc->incoming_queue = qemu_new_net_queue(qemu_deliver_packet_iov, nc);
     nc->destructor = destructor;
     QTAILQ_INIT(&nc->filters);
@@ -279,6 +287,10 @@ NetClientState *qemu_new_net_client(NetClientInfo *info,
     return nc;
 }
 
+/*
+ * pci_e1000_realize()
+ *  qemu_new_nic()
+ */
 NICState *qemu_new_nic(NetClientInfo *info,
                        NICConf *conf,
                        const char *model,
@@ -624,6 +636,16 @@ void qemu_flush_queued_packets(NetClientState *nc)
     qemu_flush_or_purge_queued_packets(nc, false);
 }
 
+/*
+ * set_tctl()
+ *  start_xmit()
+ *   process_tx_desc()
+ *    xmit_seg()
+ * 	   e1000_send_packet()
+ * 	    qemu_send_packet()
+ *       qemu_send_packet_async()
+ *        qemu_send_packet_async_with_flags()
+ */
 static ssize_t qemu_send_packet_async_with_flags(NetClientState *sender,
                                                  unsigned flags,
                                                  const uint8_t *buf, int size,
@@ -659,6 +681,18 @@ static ssize_t qemu_send_packet_async_with_flags(NetClientState *sender,
     return qemu_net_queue_send(queue, sender, flags, buf, size, sent_cb);
 }
 
+/*
+ * set_tctl()
+ *  start_xmit()
+ *   process_tx_desc()
+ *    xmit_seg()
+ * 	   e1000_send_packet()
+ * 	    qemu_send_packet()
+ *       qemu_send_packet_async()
+ *
+ * tap_send()
+ *  qemu_send_packet_async()
+ */
 ssize_t qemu_send_packet_async(NetClientState *sender,
                                const uint8_t *buf, int size,
                                NetPacketSent *sent_cb)
@@ -667,6 +701,14 @@ ssize_t qemu_send_packet_async(NetClientState *sender,
                                              buf, size, sent_cb);
 }
 
+/*
+ * set_tctl()
+ *  start_xmit()
+ *   process_tx_desc()
+ *    xmit_seg()
+ *     e1000_send_packet()
+ *      qemu_send_packet()
+*/
 void qemu_send_packet(NetClientState *nc, const uint8_t *buf, int size)
 {
     qemu_send_packet_async(nc, buf, size, NULL);
@@ -709,6 +751,19 @@ static ssize_t nc_sendv_compat(NetClientState *nc, const struct iovec *iov,
     return ret;
 }
 
+/*
+* set_tctl()
+*  start_xmit()
+*   process_tx_desc()
+*	xmit_seg()
+*	 e1000_send_packet()
+*	  qemu_send_packet()
+*	   qemu_send_packet_async()
+*		qemu_send_packet_async_with_flags()
+*		 qemu_net_queue_send()
+*		  qemu_net_queue_deliver()
+*          qemu_deliver_packet_iov()
+*/
 ssize_t qemu_deliver_packet_iov(NetClientState *sender,
                                 unsigned flags,
                                 const struct iovec *iov,
@@ -727,6 +782,7 @@ ssize_t qemu_deliver_packet_iov(NetClientState *sender,
     }
 
     if (nc->info->receive_iov && !(flags & QEMU_NET_PACKET_FLAG_RAW)) {
+		//走这里,tap_receive_iov
         ret = nc->info->receive_iov(nc, iov, iovcnt);
     } else {
         ret = nc_sendv_compat(nc, iov, iovcnt, flags);
@@ -866,6 +922,14 @@ int qemu_find_nic_model(NICInfo *nd, const char * const *models,
     return -1;
 }
 
+/*
+ * main() [vl.c]
+ *  net_init_clients() 
+ *   net_init_client() 处理-net参数
+ *    net_client_init()
+ *     net_client_init1()
+ *      net_init_nic()
+ */
 static int net_init_nic(const Netdev *netdev, const char *name,
                         NetClientState *peer, Error **errp)
 {
@@ -909,12 +973,14 @@ static int net_init_nic(const Netdev *netdev, const char *name,
         error_setg(errp, "invalid syntax for ethernet address");
         return -1;
     }
+	//下面确定虚拟网卡的mac address
     if (nic->has_macaddr &&
         is_multicast_ether_addr(nd->macaddr.a)) {
         error_setg(errp,
                    "NIC cannot have multicast MAC address (odd 1st byte)");
         return -1;
     }
+	//如果没有指定网卡地址,默认来一个
     qemu_macaddr_default_if_unset(&nd->macaddr);
 
     if (nic->has_vectors) {
@@ -964,14 +1030,28 @@ static int (* const net_client_init_fun[NET_CLIENT_DRIVER__MAX])(
 };
 
 
+/*
+ * main() [vl.c]
+ *  net_init_clients()
+ *   net_init_netdev() 处理 -netdev参数
+ *    net_client_init()
+ *     net_client_init1()
+ * 
+ * main() [vl.c]
+ *  net_init_clients() 
+ *   net_init_client() 处理-net参数
+ *    net_client_init()
+ *     net_client_init1()
+ */
 static int net_client_init1(const void *object, bool is_netdev, Error **errp)
 {
     Netdev legacy = {0};
+	
     const Netdev *netdev;
     const char *name;
     NetClientState *peer = NULL;
 
-    if (is_netdev) {
+    if (is_netdev) { //-netdev的参数
         netdev = object;
         name = netdev->id;
 
@@ -1045,13 +1125,24 @@ static int net_client_init1(const void *object, bool is_netdev, Error **errp)
             return -1;
         }
 
-        /* Do not add to a vlan if it's a nic with a netdev= parameter. */
+        /*
+         * Do not add to a vlan if it's a nic with a netdev= parameter. 
+         * 将设备添加到hubs中去，
+         *
+         * -net nic,model=e1000,netdev=foo  -netdev tap,ifname=tap0,script=no,downscript=no,id=foo
+         * 这个参数例子已经指定nic 的netdev参数,已经关联起前后端了，不会调用下面这个函数
+		 */
         if (netdev->type != NET_CLIENT_DRIVER_NIC ||
             !opts->u.nic.data->has_netdev) {
+            
             peer = net_hub_add_port(net->has_vlan ? net->vlan : 0, NULL);
         }
     }
 
+    /*
+     * 走起
+     * net_init_tap[在tap.c中], net_init_nic
+     */
     if (net_client_init_fun[netdev->type](netdev, name, peer, errp) < 0) {
         /* FIXME drop when all init functions store an Error */
         if (errp && !*errp) {
@@ -1063,7 +1154,19 @@ static int net_client_init1(const void *object, bool is_netdev, Error **errp)
     return 0;
 }
 
-
+/*
+ * main() [vl.c]
+ *  net_init_clients()
+ *   net_init_netdev() 处理 -netdev参数
+ *    net_client_init()
+ *
+ * 
+ * main() [vl.c]
+ *  net_init_clients() 
+ *   net_init_client() 处理-net参数
+ *    net_client_init()
+ * 
+ */
 int net_client_init(QemuOpts *opts, bool is_netdev, Error **errp)
 {
     void *object = NULL;
@@ -1102,13 +1205,13 @@ int net_client_init(QemuOpts *opts, bool is_netdev, Error **errp)
         }
     }
 
-    if (is_netdev) {
+    if (is_netdev) {//-netdev参数
         visit_type_Netdev(v, NULL, (Netdev **)&object, &err);
-    } else {
+    } else {//-net参数
         visit_type_NetLegacy(v, NULL, (NetLegacy **)&object, &err);
     }
 
-    if (!err) {
+    if (!err) {//走起
         ret = net_client_init1(object, is_netdev, &err);
     }
 
@@ -1482,6 +1585,12 @@ void net_check_clients(void)
     }
 }
 
+/*
+ * main() [vl.c]
+ *  net_init_clients()
+ *   net_init_client()
+ *处理-net参数
+ */
 static int net_init_client(void *dummy, QemuOpts *opts, Error **errp)
 {
     Error *local_err = NULL;
@@ -1495,6 +1604,12 @@ static int net_init_client(void *dummy, QemuOpts *opts, Error **errp)
     return 0;
 }
 
+/*
+ * main() [vl.c]
+ *  net_init_clients()
+ *   net_init_netdev()
+ * 处理 -netdev参数
+ */
 static int net_init_netdev(void *dummy, QemuOpts *opts, Error **errp)
 {
     Error *local_err = NULL;
@@ -1509,8 +1624,18 @@ static int net_init_netdev(void *dummy, QemuOpts *opts, Error **errp)
     return ret;
 }
 
+/*
+ * main() [vl.c]
+ *  net_init_clients()
+ *
+ * 对网卡参数进行初始化 主要是-net -netdev这两个参数
+ *
+ * 以下面的参数为例子进行分析
+ * -net nic,model=e1000,netdev=foo  -netdev tap,ifname=tap0,script=no,downscript=no,id=foo
+ */
 int net_init_clients(void)
 {
+    //得到-net参数 -net nic,model=e1000,netdev=foo
     QemuOptsList *net = qemu_find_opts("net");
 
     net_change_state_entry =
@@ -1518,6 +1643,7 @@ int net_init_clients(void)
 
     QTAILQ_INIT(&net_clients);
 
+    //-netdev参数, -netdev tap,ifname=tap0,script=no,downscript=no,id=foo
     if (qemu_opts_foreach(qemu_find_opts("netdev"),
                           net_init_netdev, NULL, NULL)) {
         return -1;

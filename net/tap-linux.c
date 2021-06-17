@@ -38,6 +38,18 @@
 
 #define PATH_NET_TUN "/dev/net/tun"
 
+/*
+ * main() [vl.c]
+ *	net_init_clients() 
+ *	 net_init_client() 处理-net参数
+ *	  net_client_init()
+ *	   net_client_init1()
+ *		net_init_tap()
+ *       net_tap_init()
+ *        tap_open()
+ *
+ *  打开PATH_NET_TUN设备文件
+ */
 int tap_open(char *ifname, int ifname_size, int *vnet_hdr,
              int vnet_hdr_required, int mq_required, Error **errp)
 {
@@ -46,14 +58,17 @@ int tap_open(char *ifname, int ifname_size, int *vnet_hdr,
     int len = sizeof(struct virtio_net_hdr);
     unsigned int features;
 
+    //打开PATH_NET_TUN设备文件
     TFR(fd = open(PATH_NET_TUN, O_RDWR));
     if (fd < 0) {
         error_setg_errno(errp, errno, "could not open %s", PATH_NET_TUN);
         return -1;
     }
     memset(&ifr, 0, sizeof(ifr));
+	
     ifr.ifr_flags = IFF_TAP | IFF_NO_PI;
 
+    //获取驱动属性
     if (ioctl(fd, TUNGETFEATURES, &features) == -1) {
         error_report("warning: TUNGETFEATURES failed: %s", strerror(errno));
         features = 0;
@@ -101,6 +116,8 @@ int tap_open(char *ifname, int ifname_size, int *vnet_hdr,
         pstrcpy(ifr.ifr_name, IFNAMSIZ, ifname);
     else
         pstrcpy(ifr.ifr_name, IFNAMSIZ, "tap%d");
+
+	//QEMU进程attach到tap设备上
     ret = ioctl(fd, TUNSETIFF, (void *) &ifr);
     if (ret != 0) {
         if (ifname[0] != '\0') {
@@ -113,6 +130,7 @@ int tap_open(char *ifname, int ifname_size, int *vnet_hdr,
         close(fd);
         return -1;
     }
+	
     pstrcpy(ifname, ifname_size, ifr.ifr_name);
     fcntl(fd, F_SETFL, O_NONBLOCK);
     return fd;
@@ -130,6 +148,17 @@ int tap_open(char *ifname, int ifname_size, int *vnet_hdr,
  */
 #define TAP_DEFAULT_SNDBUF 0
 
+/*
+ * main() [vl.c]
+ *  net_init_clients() 
+ *   net_init_client() 处理-net参数
+ *    net_client_init()
+ *     net_client_init1()
+ *      net_init_tap()
+ *       net_init_tap()
+ *        net_init_tap_one(name="tap")
+ *          tap_set_sndbuf()
+ */
 void tap_set_sndbuf(int fd, const NetdevTapOptions *tap, Error **errp)
 {
     int sndbuf;

@@ -1707,6 +1707,10 @@ void hmp_migrate(Monitor *mon, const QDict *qdict)
     }
 }
 
+/*
+ * qmp_init_marshal() 将hmp_device_add添加为qmp命令
+ *  hmp_device_add()
+ */
 void hmp_device_add(Monitor *mon, const QDict *qdict)
 {
     Error *err = NULL;

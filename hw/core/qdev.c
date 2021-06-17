@@ -109,7 +109,13 @@ void qdev_set_parent_bus(DeviceState *dev, BusState *bus)
 
 /* Create a new device.  This only initializes the device state
    structure and allows properties to be set.  The device still needs
-   to be realized.  See qdev-core.h.  */
+   to be realized.  See qdev-core.h. 
+ *
+ * qdev_create创建设备,在随主板初始化的时候一起创建，如南北桥，一些传统的ISA设备、默认的显卡设备等
+ * qdev_device_add创建设备，在QEMU monitor中通过device_add添加的设备
+ *
+ * 参数bus==NULL的时候，设备挂载到 main_system_bus上面
+ */
 DeviceState *qdev_create(BusState *bus, const char *name)
 {
     DeviceState *dev;
@@ -128,6 +134,10 @@ DeviceState *qdev_create(BusState *bus, const char *name)
     return dev;
 }
 
+/*
+ * qdev_create()
+ *  qdev_try_create()
+ */
 DeviceState *qdev_try_create(BusState *bus, const char *type)
 {
     DeviceState *dev;
@@ -135,21 +145,24 @@ DeviceState *qdev_try_create(BusState *bus, const char *type)
     if (object_class_by_name(type) == NULL) {
         return NULL;
     }
+	//创建设备
     dev = DEVICE(object_new(type));
     if (!dev) {
         return NULL;
     }
 
-    if (!bus) {
+    if (!bus) {//如果设备所在总线参数为NULL，就用main_system_bus作为根总线
+    
         /* Assert that the device really is a SysBusDevice before
          * we put it onto the sysbus. Non-sysbus devices which aren't
          * being put onto a bus should be created with object_new(TYPE_FOO),
          * not qdev_create(NULL, TYPE_FOO).
          */
         g_assert(object_dynamic_cast(OBJECT(dev), TYPE_SYS_BUS_DEVICE));
-        bus = sysbus_get_default();
+        bus = sysbus_get_default(); //得到main_system_bus上
     }
 
+    //设置设备所在的总线
     qdev_set_parent_bus(dev, bus);
     object_unref(OBJECT(dev));
     return dev;

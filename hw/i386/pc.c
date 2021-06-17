@@ -1298,6 +1298,13 @@ void pc_machine_done(Notifier *notifier, void *data)
     }
 }
 
+/*
+ * main()
+ *  DEFINE_I440FX_MACHINE 定于出来的函数pc_init_##suffix()调用
+ *   pc_init1(host_type=TYPE_I440FX_PCI_HOST_BRIDGE,
+              pci_type=TYPE_I440FX_PCI_DEVICE)
+ *    pc_guest_info_init()             
+ */
 void pc_guest_info_init(PCMachineState *pcms)
 {
     int i;
@@ -1553,6 +1560,13 @@ static const MemoryRegionOps ioportF0_io_ops = {
     },
 };
 
+/*
+ * main()
+ *  DEFINE_I440FX_MACHINE 定于出来的函数pc_init_##suffix()调用
+ *   pc_init1(host_type=TYPE_I440FX_PCI_HOST_BRIDGE,
+              pci_type=TYPE_I440FX_PCI_DEVICE)
+ *    pc_basic_device_init()             
+ */
 void pc_basic_device_init(ISABus *isa_bus, qemu_irq *gsi,
                           ISADevice **rtc_state,
                           bool create_fdctrl,
@@ -1655,11 +1669,19 @@ void pc_basic_device_init(ISABus *isa_bus, qemu_irq *gsi,
     }
 }
 
+/*
+ * main()
+ *  DEFINE_I440FX_MACHINE 定于出来的函数pc_init_##suffix()调用
+ *   pc_init1(host_type=TYPE_I440FX_PCI_HOST_BRIDGE,
+              pci_type=TYPE_I440FX_PCI_DEVICE)
+ *    pc_nic_init()             
+ */
 void pc_nic_init(ISABus *isa_bus, PCIBus *pci_bus)
 {
     int i;
 
     rom_set_order_override(FW_CFG_ORDER_OVERRIDE_NIC);
+	//初始化nd_table中所有的NICinfo对象
     for (i = 0; i < nb_nics; i++) {
         NICInfo *nd = &nd_table[i];
 

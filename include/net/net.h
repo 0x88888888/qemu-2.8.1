@@ -65,11 +65,15 @@ typedef int (SetVnetBE)(NetClientState *, bool);
 typedef struct SocketReadState SocketReadState;
 typedef void (SocketReadStateFinalize)(SocketReadState *rs);
 
+/*
+ * net_tap_info
+ */
 typedef struct NetClientInfo {
     NetClientDriver type;
     size_t size;
     NetReceive *receive;
     NetReceive *receive_raw;
+	//tap_receive_iov
     NetReceiveIOV *receive_iov;
     NetCanReceive *can_receive;
     NetCleanup *cleanup;
@@ -90,7 +94,9 @@ struct NetClientState {
     NetClientInfo *info;
     int link_down;
     QTAILQ_ENTRY(NetClientState) next;
+	//表示对端信息
     NetClientState *peer;
+	//接收队列
     NetQueue *incoming_queue;
     char *model;
     char *name;
@@ -182,11 +188,17 @@ void net_socket_rs_init(SocketReadState *rs,
 
 #define MAX_NICS 8
 
+/*
+ * 虚拟机的网卡信息
+ * 前端网卡设备
+ */
 struct NICInfo {
     MACAddr macaddr;
-    char *model;
+    char *model; //默认为e1000
     char *name;
     char *devaddr;
+
+	//后端网卡设备
     NetClientState *netdev;
     int used;         /* is this slot in nd_table[] being used? */
     int instantiated; /* does this NICInfo correspond to an instantiated NIC? */

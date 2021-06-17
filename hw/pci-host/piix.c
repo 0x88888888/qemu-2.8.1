@@ -130,7 +130,13 @@ static void piix3_write_config_xen(PCIDevice *dev,
 
 /* return the global irq number corresponding to a given device irq
    pin. We could also use the bus number to have a more precise
-   mapping. */
+   mapping. 
+ *
+ * pci_set_irq()
+ *  pci_irq_handler()
+ *   pci_change_irq_level()
+ *    pci_slot_get_pirq()
+ */
 static int pci_slot_get_pirq(PCIDevice *pci_dev, int pci_intx)
 {
     int slot_addend;
@@ -272,10 +278,13 @@ static void i440fx_pcihost_get_pci_hole64_end(Object *obj, Visitor *v,
 
 static void i440fx_pcihost_initfn(Object *obj)
 {
+    //北桥的PCI部分
     PCIHostState *s = PCI_HOST_BRIDGE(obj);
 
+    //配置空间
     memory_region_init_io(&s->conf_mem, obj, &pci_host_conf_le_ops, s,
                           "pci-conf-idx", 4);
+	//数据空间
     memory_region_init_io(&s->data_mem, obj, &pci_host_data_le_ops, s,
                           "pci-conf-data", 4);
 
@@ -301,10 +310,13 @@ static void i440fx_pcihost_realize(DeviceState *dev, Error **errp)
     PCIHostState *s = PCI_HOST_BRIDGE(dev);
     SysBusDevice *sbd = SYS_BUS_DEVICE(dev);
 
-    sysbus_add_io(sbd, 0xcf8, &s->conf_mem);
+	//下面两个操作将配置空间的MMIO和PIO关联起来
+
+    sysbus_add_io(sbd, 0xcf8, &s->conf_mem);//配置空间
     sysbus_init_ioports(sbd, 0xcf8, 4);
 
-    sysbus_add_io(sbd, 0xcfc, &s->data_mem);
+    //下面两个操作将数据空间的MMIO和PIO关联起来
+    sysbus_add_io(sbd, 0xcfc, &s->data_mem);//数据空间
     sysbus_init_ioports(sbd, 0xcfc, 4);
 }
 
@@ -320,7 +332,7 @@ static void i440fx_realize(PCIDevice *dev, Error **errp)
 /*
  * DEFINE_I440FX_MACHINE 定于出来的函数pc_init_##suffix()调用
  *  pc_init1()
- *   i440fx_init()
+ *   i440fx_init(address_space_mem==system_memory,address_space_io==system_io)
  */
 PCIBus *i440fx_init(const char *host_type, const char *pci_type,
                     PCII440FXState **pi440fx_state,
@@ -343,11 +355,15 @@ PCIBus *i440fx_init(const char *host_type, const char *pci_type,
     unsigned i;
     I440FXState *i440fx;
 
+    //创建北桥,挂到系统总线(main_system_bus)上
     dev = qdev_create(NULL, host_type);
     s = PCI_HOST_BRIDGE(dev);
+	//北桥下面创建PCI总线 "pci.0"？root总线?
     b = pci_bus_new(dev, NULL, pci_address_space,
                     address_space_io, 0, TYPE_PCI_BUS);
+	
     s->bus = b;
+	//将北桥挂载到machine下的i440对象上
     object_property_add_child(qdev_get_machine(), "i440fx", OBJECT(dev), NULL);
     qdev_init_nofail(dev);
 
@@ -401,10 +417,13 @@ PCIBus *i440fx_init(const char *host_type, const char *pci_type,
         piix3 = PIIX3_PCI_DEVICE(pci_dev);
         pci_bus_irqs(b, xen_piix3_set_irq, xen_pci_slot_get_pirq,
                 piix3, XEN_PIIX_NUM_PIRQS);
-    } else {
+    } else { //这里
         PCIDevice *pci_dev = pci_create_simple_multifunction(b,
                              -1, true, "PIIX3");
         piix3 = PIIX3_PCI_DEVICE(pci_dev);
+		/*
+		 * PCI总线的IRQ路由设置
+		 */
         pci_bus_irqs(b, piix3_set_irq, pci_slot_get_pirq, piix3,
                 PIIX_NUM_PIRQS);
         pci_bus_set_route_irq_fn(b, piix3_route_intx_pin_to_irq);
@@ -471,6 +490,12 @@ static void piix3_set_irq_level(PIIX3State *piix3, int pirq, int level)
     piix3_set_irq_pic(piix3, pic_irq);
 }
 
+/*
+ * pci_set_irq()
+ *  pci_irq_handler()
+ *   pci_change_irq_level()
+ *    piix3_set_irq()
+ */
 static void piix3_set_irq(void *opaque, int pirq, int level)
 {
     PIIX3State *piix3 = opaque;

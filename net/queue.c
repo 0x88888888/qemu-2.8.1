@@ -148,6 +148,18 @@ void qemu_net_queue_append_iov(NetQueue *queue,
     QTAILQ_INSERT_TAIL(&queue->packets, packet, entry);
 }
 
+/*
+* set_tctl()
+*  start_xmit()
+*	process_tx_desc()
+*	 xmit_seg()
+*	  e1000_send_packet()
+*	   qemu_send_packet()
+*		qemu_send_packet_async()
+*		 qemu_send_packet_async_with_flags()
+*		  qemu_net_queue_send()
+*          qemu_net_queue_deliver()
+*/
 static ssize_t qemu_net_queue_deliver(NetQueue *queue,
                                       NetClientState *sender,
                                       unsigned flags,
@@ -161,6 +173,7 @@ static ssize_t qemu_net_queue_deliver(NetQueue *queue,
     };
 
     queue->delivering = 1;
+	//qemu_deliver_packet_iov
     ret = queue->deliver(sender, flags, &iov, 1, queue->opaque);
     queue->delivering = 0;
 
@@ -182,6 +195,17 @@ static ssize_t qemu_net_queue_deliver_iov(NetQueue *queue,
     return ret;
 }
 
+/*
+ * set_tctl()
+ *  start_xmit()
+ *   process_tx_desc()
+ *    xmit_seg()
+ *	   e1000_send_packet()
+ *	    qemu_send_packet()
+ *	     qemu_send_packet_async()
+ *		  qemu_send_packet_async_with_flags()
+ *         qemu_net_queue_send()
+ */
 ssize_t qemu_net_queue_send(NetQueue *queue,
                             NetClientState *sender,
                             unsigned flags,
@@ -191,13 +215,14 @@ ssize_t qemu_net_queue_send(NetQueue *queue,
 {
     ssize_t ret;
 
-    if (queue->delivering || !qemu_can_send_packet(sender)) {
+    if (queue->delivering || !qemu_can_send_packet(sender)) {//将数据挂到发送队列上去
         qemu_net_queue_append(queue, sender, flags, data, size, sent_cb);
         return 0;
     }
 
+    //发送
     ret = qemu_net_queue_deliver(queue, sender, flags, data, size);
-    if (ret == 0) {
+    if (ret == 0) {//失败了，挂到队列上去
         qemu_net_queue_append(queue, sender, flags, data, size, sent_cb);
         return 0;
     }

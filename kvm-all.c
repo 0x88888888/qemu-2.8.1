@@ -78,6 +78,7 @@ struct KVMState
     int fd;
 	/*
 	 * 指向虚拟机的fd
+	 * kvm_init中创建
 	 */
     int vmfd;
 	//是否支持KVM_CAP_COALESCED_MMIO
@@ -102,7 +103,13 @@ struct KVMState
     int intx_set_mask;
     /* The man page (and posix) say ioctl numbers are signed int, but
      * they're not.  Linux, glibc and *BSD all treat ioctl numbers as
-     * unsigned, and treating them as signed here can break things */
+     * unsigned, and treating them as signed here can break things 
+     *
+     * 用kvm_set_irq给guest os注入中断的时候用
+     * 值可以是KVM_IRQ_LINE或者是KVM_IRQ_LINE_STATUS
+     * 通常是KVM_IRQ_LINE_STATUS
+     *
+     */
     unsigned irq_set_ioctl;
     unsigned int sigmask_len;
     GHashTable *gsimap;
@@ -1052,6 +1059,16 @@ static void kvm_handle_interrupt(CPUState *cpu, int mask)
     }
 }
 
+/*
+ * kvm_openpic_set_irq()
+ * kvm_pic_set_irq()
+ * ioapic_service()
+ * kvm_irqchip_send_msi()
+ * kvm_ioapic_set_irq()
+ *  kvm_set_irq()
+ *
+ * 通过内核的KVM将中断通知到guest os
+ */
 int kvm_set_irq(KVMState *s, int irq, int level)
 {
     struct kvm_irq_level event;
@@ -1116,15 +1133,24 @@ void kvm_init_irq_routing(KVMState *s)
     kvm_arch_init_irq_routing(s);
 }
 
+/*
+ * main()
+ *  DEFINE_I440FX_MACHINE 定于出来的函数pc_init_##suffix()调用
+ *   pc_init1(host_type=TYPE_I440FX_PCI_HOST_BRIDGE,
+              pci_type=TYPE_I440FX_PCI_DEVICE)
+ *    kvm_pc_setup_irq_routing()
+ *     kvm_irqchip_commit_routes()
+ */
 void kvm_irqchip_commit_routes(KVMState *s)
 {
     int ret;
 
-    if (kvm_gsi_direct_mapping()) {
+    //返回false
+    if (kvm_gsi_direct_mapping()) { 
         return;
     }
 
-    if (!kvm_gsi_routing_enabled()) {
+    if (!kvm_gsi_routing_enabled()) {//不走这里
         return;
     }
 
@@ -1645,7 +1671,8 @@ bool kvm_vcpu_id_is_valid(int vcpu_id)
 /*
  * main() [vl.c]
  *  configure_accelerator()
- *   kvm_init()
+ *   accel_init_machine()
+ *    kvm_init()
  */
 static int kvm_init(MachineState *ms)
 {

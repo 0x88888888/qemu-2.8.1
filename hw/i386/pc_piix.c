@@ -65,14 +65,19 @@ static const int ide_irq[MAX_IDE_BUS] = { 14, 15 };
  *
  * 通过宏DEFINE_I440FX_MACHINE来定于一个函数来调用这个函数
  *
- * DEFINE_I440FX_MACHINE 定于出来的函数pc_init_##suffix()调用
- *  pc_init1()
+ * main()
+ *  DEFINE_I440FX_MACHINE 定于出来的函数pc_init_##suffix()调用
+ *   pc_init1(host_type=TYPE_I440FX_PCI_HOST_BRIDGE,
+              pci_type=TYPE_I440FX_PCI_DEVICE)
  */
 static void pc_init1(MachineState *machine,
                      const char *host_type, const char *pci_type)
 {
+    //类型转换一下
     PCMachineState *pcms = PC_MACHINE(machine);
+	//得到state对应的class
     PCMachineClass *pcmc = PC_MACHINE_GET_CLASS(pcms);
+	
     MemoryRegion *system_memory = get_system_memory();
     MemoryRegion *system_io = get_system_io();
     int i;
@@ -191,7 +196,7 @@ static void pc_init1(MachineState *machine,
     }
 
     gsi_state = g_malloc0(sizeof(*gsi_state));
-    if (kvm_ioapic_in_kernel()) {
+    if (kvm_ioapic_in_kernel()) { //走这里
         kvm_pc_setup_irq_routing(pcmc->pci_enabled);
         pcms->gsi = qemu_allocate_irqs(kvm_pc_gsi_handler, gsi_state,
                                        GSI_NUM_PINS);
@@ -242,10 +247,12 @@ static void pc_init1(MachineState *machine,
         pcms->vmport = xen_enabled() ? ON_OFF_AUTO_OFF : ON_OFF_AUTO_ON;
     }
 
-    /* init basic PC hardware */
+    /* init basic PC hardware 
+	 */
     pc_basic_device_init(isa_bus, pcms->gsi, &rtc_state, true,
                          (pcms->vmport != ON_OFF_AUTO_ON), 0x4);
 
+    //传给qemu的nic参数
     pc_nic_init(isa_bus, pci_bus);
 
     ide_drive_get(hd, ARRAY_SIZE(hd));
@@ -259,6 +266,7 @@ static void pc_init1(MachineState *machine,
         idebus[0] = qdev_get_child_bus(&dev->qdev, "ide.0");
         idebus[1] = qdev_get_child_bus(&dev->qdev, "ide.1");
     } else {
+		
         for(i = 0; i < MAX_IDE_BUS; i++) {
             ISADevice *dev;
             char busname[] = "ide.0";
@@ -284,6 +292,7 @@ static void pc_init1(MachineState *machine,
         DeviceState *piix4_pm;
         I2CBus *smbus;
 
+        //smi在qemu层面的中断处理函数
         smi_irq = qemu_allocate_irq(pc_acpi_smi_interrupt, first_cpu, 0);
         /* TODO: Populate SPD eeprom data.  */
         smbus = piix4_pm_init(pci_bus, piix3_devfn + 3, 0xb100,

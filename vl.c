@@ -139,6 +139,9 @@ const char *mem_path = NULL;
 int mem_prealloc = 0; /* force preallocation of physical target memory */
 bool enable_mlock = false;
 int nb_nics;
+/*
+ * 保存虚拟机所有的网卡信息
+ */
 NICInfo nd_table[MAX_NICS];
 int autostart;
 static int rtc_utc = 1;
@@ -1971,6 +1974,8 @@ static bool main_loop_should_exit(void)
 /*
  * main() [vl.c]
  *  main_loop()
+ *
+ * 等待事件循环
  */
 static void main_loop(void)
 {
@@ -4214,6 +4219,7 @@ int main(int argc, char **argv, char **envp)
     if (!trace_init_backends()) {
         exit(1);
     }
+	//qemu的日志文件
     trace_init_file(trace_file);
 
     /* Open the logfile at this point and set the log mask if necessary.
@@ -4276,6 +4282,7 @@ int main(int argc, char **argv, char **envp)
 
     qemu_opts_foreach(qemu_find_opts("device"),
                       default_driver_check, NULL, NULL);
+	
     qemu_opts_foreach(qemu_find_opts("global"),
                       default_driver_check, NULL, NULL);
 
@@ -4526,6 +4533,7 @@ int main(int argc, char **argv, char **envp)
 
     colo_info_init();
 
+    //对网卡参数进行初始化
     if (net_init_clients() < 0) {
         exit(1);
     }
@@ -4635,6 +4643,12 @@ int main(int argc, char **argv, char **envp)
     current_machine->boot_order = boot_order;
     current_machine->cpu_model = cpu_model;
 
+    /*
+     * 看这个
+     * DEFINE_I440FX_MACHINE(v2_8, "pc-i440fx-2.8", NULL, pc_i440fx_2_8_machine_options)
+     *
+     * 会调用 pc_init1(machine, TYPE_I440FX_PCI_HOST_BRIDGE, TYPE_I440FX_PCI_DEVICE);
+     */
     machine_class->init(current_machine);
 
     realtime_init();
@@ -4726,11 +4740,12 @@ int main(int argc, char **argv, char **envp)
         exit(1);
     }
 
+    //标记一下,vm硬件已经创建好，但是还没有运行啊
     qdev_machine_creation_done();
 
     /* TODO: once all bus devices are qdevified, this should be done
      * when bus is created by qdev.c */
-    qemu_register_reset(qbus_reset_all_fn, sysbus_get_default() /* 系统总线 */ );
+    qemu_register_reset(qbus_reset_all_fn, sysbus_get_default() /* 创建系统总线 */ );
     qemu_run_machine_init_done_notifiers();
 
     if (rom_check_and_register_reset() != 0) {
@@ -4767,7 +4782,8 @@ int main(int argc, char **argv, char **envp)
             exit(1);
         }
     } else if (autostart) {//本机启动vm
-    
+
+	    //启动所有的vCPU
         vm_start();
     }
 

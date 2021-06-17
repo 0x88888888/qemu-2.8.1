@@ -365,10 +365,15 @@ typedef void (ObjectFree)(void *obj);
  *
  * The base for all classes.  The only thing that #ObjectClass contains is an
  * integer type handle.
+ *
+ * 
  */
 struct ObjectClass
 {
-    /*< private >*/
+    /*< private >
+     * 这里关联到TypeImpl
+     * 所有各种XXXClass和TypeImpl关联起来了
+     */
     Type type;
     GSList *interfaces;
 
@@ -391,11 +396,17 @@ struct ObjectClass
  * As a result, #Object contains a reference to the objects type as its
  * first member.  This allows identification of the real type of the object at
  * run time.
+ *
+ * Object的作用是关联XXXState和XXXClass
+ *               然后有个properties可以存放一些property
  */
 struct Object
 {
     /*< private >*/
-    //具体的PCIDeviceClass
+    /*
+     *具体的PCIDeviceClass
+     * 通过这个把各种XXXState和各种XXXclass关联起来了
+     */
     ObjectClass *class;
     ObjectFree *free;
     GHashTable *properties;
@@ -446,6 +457,15 @@ struct Object
  * 所有的TypeInfo对象都转成TypeImpl存储在静态函数type_table_get(void)函数中定义的静态对象type_table中 
  *
  * e1000_base_info --e1000-base
+ * virtio_pci_info 
+ *   virtio_balloon_pci_info
+ *   virtio_balloon_info  ------> VirtIOBalloon
+ *
+ *   virtio_scsi_pci_info
+ *   virtio_crypto_pci_info
+ *
+ *   virtio_mmio_info
+ *   virtio_mmio_bus_info
  *
  * 类型，对象相关的步骤 
  * 1:注册类型 , (1),type_init,(2)register_module_init,(3)type_register
