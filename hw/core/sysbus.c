@@ -125,6 +125,15 @@ bool sysbus_has_mmio(SysBusDevice *dev, unsigned int n)
     return (n < dev->num_mmio);
 }
 
+/*
+ * main()
+ *  DEFINE_I440FX_MACHINE 定于出来的函数pc_init_##suffix()调用
+ *   pc_init1(host_type=TYPE_I440FX_PCI_HOST_BRIDGE, //北桥的类型
+			pci_type=TYPE_I440FX_PCI_DEVICE //北桥对应的pci设备的名字 )
+ *    ioapic_init_gsi()				
+ *     sysbus_mmio_map(n=0,addr=IO_APIC_DEFAULT_ADDRESS)
+ *      sysbus_mmio_map_common(n=0,addr=IO_APIC_DEFAULT_ADDRESS,may_overlap=false,priority=0)
+ */
 static void sysbus_mmio_map_common(SysBusDevice *dev, int n, hwaddr addr,
                                    bool may_overlap, int priority)
 {
@@ -152,6 +161,14 @@ static void sysbus_mmio_map_common(SysBusDevice *dev, int n, hwaddr addr,
     }
 }
 
+/*
+ * main()
+ *  DEFINE_I440FX_MACHINE 定于出来的函数pc_init_##suffix()调用
+ *   pc_init1(host_type=TYPE_I440FX_PCI_HOST_BRIDGE, //北桥的类型
+			pci_type=TYPE_I440FX_PCI_DEVICE //北桥对应的pci设备的名字 )
+ *    ioapic_init_gsi()				
+ *     sysbus_mmio_map(n=0,addr=IO_APIC_DEFAULT_ADDRESS)
+ */
 void sysbus_mmio_map(SysBusDevice *dev, int n, hwaddr addr)
 {
     sysbus_mmio_map_common(dev, n, addr, false, 0);

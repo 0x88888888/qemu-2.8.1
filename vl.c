@@ -2431,6 +2431,10 @@ static int fsdev_init_func(void *opaque, QemuOpts *opts, Error **errp)
 }
 #endif
 
+/*
+ * main()[vl.c]
+ *  mon_init_func()
+ */
 static int mon_init_func(void *opaque, QemuOpts *opts, Error **errp)
 {
     CharDriverState *chr;

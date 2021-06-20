@@ -107,7 +107,15 @@ void *qemu_memalign(size_t alignment, size_t size)
     return qemu_oom_check(qemu_try_memalign(alignment, size));
 }
 
-/* alloc shared memory pages */
+/*
+ * memory_region_init_ram()
+ *	qemu_ram_alloc()
+ *	 qemu_ram_alloc_internal()
+ *    ram_block_add()
+ *     qemu_anon_ram_alloc()
+ *
+ * alloc shared memory pages 
+ */
 void *qemu_anon_ram_alloc(size_t size, uint64_t *alignment)
 {
     size_t align = QEMU_VMALLOC_ALIGN;

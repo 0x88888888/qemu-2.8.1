@@ -292,7 +292,9 @@ extern int no_hpet;
 struct PCII440FXState;
 typedef struct PCII440FXState PCII440FXState;
 
+//北桥的类型
 #define TYPE_I440FX_PCI_HOST_BRIDGE "i440FX-pcihost"
+//北桥对应的PCI设备的名字
 #define TYPE_I440FX_PCI_DEVICE "i440FX"
 
 #define TYPE_IGD_PASSTHROUGH_I440FX_PCI_DEVICE "igd-passthrough-i440FX"

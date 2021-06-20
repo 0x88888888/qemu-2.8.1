@@ -46,6 +46,7 @@
 #define I440FX_PCI_HOST_BRIDGE(obj) \
     OBJECT_CHECK(I440FXState, (obj), TYPE_I440FX_PCI_HOST_BRIDGE)
 
+//北桥
 typedef struct I440FXState {
     PCIHostState parent_obj;
     Range pci_hole;
@@ -64,6 +65,7 @@ typedef struct I440FXState {
  */
 #define RCR_IOPORT 0xcf9
 
+//南桥
 typedef struct PIIX3State {
     PCIDevice dev;
 
@@ -100,6 +102,9 @@ typedef struct PIIX3State {
 #define I440FX_PCI_DEVICE(obj) \
     OBJECT_CHECK(PCII440FXState, (obj), TYPE_I440FX_PCI_DEVICE)
 
+/*
+ * 北桥对应的设备部分
+ */
 struct PCII440FXState {
     /*< private >*/
     PCIDevice parent_obj;
@@ -333,8 +338,10 @@ static void i440fx_realize(PCIDevice *dev, Error **errp)
  * DEFINE_I440FX_MACHINE 定于出来的函数pc_init_##suffix()调用
  *  pc_init1()
  *   i440fx_init(address_space_mem==system_memory,address_space_io==system_io)
+ *
+ * i440fx主板初始化
  */
-PCIBus *i440fx_init(const char *host_type, const char *pci_type,
+PCIBus *i440fx_init(const char *host_type /* 北桥的类型名称 */, const char *pci_type /* 北桥对应的pci设备的名字 */,
                     PCII440FXState **pi440fx_state,
                     int *piix3_devfn,
                     ISABus **isa_bus, qemu_irq *pic,
@@ -355,10 +362,10 @@ PCIBus *i440fx_init(const char *host_type, const char *pci_type,
     unsigned i;
     I440FXState *i440fx;
 
-    //创建北桥,挂到系统总线(main_system_bus)上
+    //创建北桥芯片,挂到系统总线(main_system_bus)上
     dev = qdev_create(NULL, host_type);
     s = PCI_HOST_BRIDGE(dev);
-	//北桥下面创建PCI总线 "pci.0"？root总线?
+	//北桥下面创建PCI root总线 "pci.0"？
     b = pci_bus_new(dev, NULL, pci_address_space,
                     address_space_io, 0, TYPE_PCI_BUS);
 	
@@ -367,18 +374,22 @@ PCIBus *i440fx_init(const char *host_type, const char *pci_type,
     object_property_add_child(qdev_get_machine(), "i440fx", OBJECT(dev), NULL);
     qdev_init_nofail(dev);
 
+    //创建北桥的pci设备部分，挂载pci总线b的0号插槽上面
     d = pci_create_simple(b, 0, pci_type);
     *pi440fx_state = I440FX_PCI_DEVICE(d);
     f = *pi440fx_state;
+	//pci地址空间和物理内存地址空间
     f->system_memory = address_space_mem;
     f->pci_address_space = pci_address_space;
     f->ram_memory = ram_memory;
 
+    //
     i440fx = I440FX_PCI_HOST_BRIDGE(dev);
     range_set_bounds(&i440fx->pci_hole, below_4g_mem_size,
                      IO_APIC_DEFAULT_ADDRESS - 1);
 
     /* setup pci memory mapping */
+	//建立pci地址空间和物理内存地址空间的映射关系
     pc_pci_as_mapping_init(OBJECT(f), f->system_memory,
                            f->pci_address_space);
 
@@ -417,7 +428,7 @@ PCIBus *i440fx_init(const char *host_type, const char *pci_type,
         piix3 = PIIX3_PCI_DEVICE(pci_dev);
         pci_bus_irqs(b, xen_piix3_set_irq, xen_pci_slot_get_pirq,
                 piix3, XEN_PIIX_NUM_PIRQS);
-    } else { //这里
+    } else { //创建南桥设备
         PCIDevice *pci_dev = pci_create_simple_multifunction(b,
                              -1, true, "PIIX3");
         piix3 = PIIX3_PCI_DEVICE(pci_dev);
@@ -907,6 +918,7 @@ static void i440fx_pcihost_class_init(ObjectClass *klass, void *data)
     dc->cannot_instantiate_with_device_add_yet = true;
 }
 
+//北桥
 static const TypeInfo i440fx_pcihost_info = {
     .name          = TYPE_I440FX_PCI_HOST_BRIDGE,
     .parent        = TYPE_PCI_HOST_BRIDGE,

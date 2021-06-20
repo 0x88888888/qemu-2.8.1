@@ -742,6 +742,8 @@ static void render_memory_region(FlatView *view,
  * memory_region_transaction_commit()
  *  address_space_update_topology()
  *   generate_memory_topology()
+ *
+ * 将MemoryRegion转成FlatView
  */
 static FlatView *generate_memory_topology(MemoryRegion *mr)
 {
@@ -825,6 +827,12 @@ static FlatView *address_space_get_flatview(AddressSpace *as)
     return view;
 }
 
+/* 
+ * memory_region_update_container_subregions()
+ *  memory_region_transaction_commit()
+ *   address_space_update_topology()
+ *    address_space_update_ioeventfds()
+ */
 static void address_space_update_ioeventfds(AddressSpace *as)
 {
     FlatView *view;
@@ -840,7 +848,8 @@ static void address_space_update_ioeventfds(AddressSpace *as)
             tmp = addrrange_shift(fr->mr->ioeventfds[i].addr,
                                   int128_sub(fr->addr.start,
                                              int128_make64(fr->offset_in_region)));
-            if (addrrange_intersects(fr->addr, tmp)) {
+			
+            if (addrrange_intersects(fr->addr, tmp)) {//有交集
                 ++ioeventfd_nb;
                 ioeventfds = g_realloc(ioeventfds,
                                           ioeventfd_nb * sizeof(*ioeventfds));
@@ -933,8 +942,9 @@ static void address_space_update_topology_pass(AddressSpace *as,
 
 
 /* 
- * memory_region_transaction_commit()
- *  address_space_update_topology()
+ * memory_region_update_container_subregions()
+ *  memory_region_transaction_commit()
+ *   address_space_update_topology()
  */
 static void address_space_update_topology(AddressSpace *as)
 {
@@ -975,7 +985,7 @@ static void memory_region_clear_pending(void)
 /*
  * memory_region_set_readonly()
  * memory_region_rom_device_set_romd()
- * memory_region_update_container_subregions()
+ * memory_region_update_container_subregions() 这里调用过来的的比较多
  * memory_region_del_subregion()
  *  memory_region_transaction_commit()
  *
@@ -2113,16 +2123,20 @@ static void memory_region_update_container_subregions(MemoryRegion *subregion)
     memory_region_transaction_begin();
 
     memory_region_ref(subregion);
+
+	//根据priority排好序
     QTAILQ_FOREACH(other, &mr->subregions, subregions_link) {
-        if (subregion->priority >= other->priority) {
+        if (subregion->priority >= other->priority) {//找到insert的位置了
             QTAILQ_INSERT_BEFORE(other, subregion, subregions_link);
             goto done;
         }
     }
-	
+
+	//添加到container的subregions上去
     QTAILQ_INSERT_TAIL(&mr->subregions, subregion, subregions_link);
 done:
     memory_region_update_pending |= mr->enabled && subregion->enabled;
+	//物理内存布局改变了，通知到内核?
     memory_region_transaction_commit();
 }
 
@@ -2388,6 +2402,14 @@ void memory_global_dirty_log_stop(void)
     MEMORY_LISTENER_CALL_GLOBAL(log_global_stop, Reverse);
 }
 
+/*
+ * main() [vl.c]
+ *  configure_accelerator()
+ *   accel_init_machine()
+ *    kvm_init()
+ *     memory_listener_register()
+ *      listener_add_address_space()
+ */
 static void listener_add_address_space(MemoryListener *listener,
                                        AddressSpace *as)
 {
@@ -2416,7 +2438,7 @@ static void listener_add_address_space(MemoryListener *listener,
         if (fr->dirty_log_mask && listener->log_start) {
             listener->log_start(listener, &section, 0, fr->dirty_log_mask);
         }
-        if (listener->region_add) {
+        if (listener->region_add) { //kvm_region_add
             listener->region_add(listener, &section);
         }
     }
@@ -2426,11 +2448,20 @@ static void listener_add_address_space(MemoryListener *listener,
     flatview_unref(view);
 }
 
+									   
+/*
+ * main() [vl.c]
+ *  configure_accelerator()
+ *   accel_init_machine()
+ *    kvm_init()
+ *     memory_listener_register()
+ */
 void memory_listener_register(MemoryListener *listener, AddressSpace *as)
 {
     MemoryListener *other = NULL;
 
     listener->address_space = as;
+	//将listener插入到memory_listeners
     if (QTAILQ_EMPTY(&memory_listeners)
         || listener->priority >= QTAILQ_LAST(&memory_listeners,
                                              memory_listeners)->priority) {
@@ -2457,6 +2488,7 @@ void memory_listener_register(MemoryListener *listener, AddressSpace *as)
         QTAILQ_INSERT_BEFORE(other, listener, link_as);
     }
 
+    //更新内存拓扑信息到内核
     listener_add_address_space(listener, as);
 }
 
@@ -2550,6 +2582,11 @@ struct MemoryRegionList {
 
 typedef QTAILQ_HEAD(queue, MemoryRegionList) MemoryRegionListHead;
 
+/*
+ * hmp_info_mtree()
+ *  mtree_info()
+ *   mtree_print_mr()
+ */
 static void mtree_print_mr(fprintf_function mon_printf, void *f,
                            const MemoryRegion *mr, unsigned int level,
                            hwaddr base,
@@ -2649,6 +2686,10 @@ static void mtree_print_mr(fprintf_function mon_printf, void *f,
     }
 }
 
+/*
+ * hmp_info_mtree()
+ *  mtree_info()
+ */
 void mtree_info(fprintf_function mon_printf, void *f)
 {
     MemoryRegionListHead ml_head;

@@ -23,17 +23,24 @@
 #include "hw/xen/xen.h"
 
 /* 
- * 表示虚拟机中的一段物理内存
+ * 表示host分配给虚拟机的一段物理内存
  *
  * 所有的RAMBlock都链接到ram_list中去
+ *
+ * MemoryRegion->ram_block 
  */
 struct RAMBlock {
     struct rcu_head rcu;
+	//所属的MemoryRegion
     struct MemoryRegion *mr;
 	/*
 	 * 表示虚拟机物理内存对应到QEMU进程地址空间的虚拟内存
+	 * ram_block_add()中设定
 	 */
     uint8_t *host;
+	/*
+	 * 在ram_block_add()中确定,表示这个RAMBlock在guest vm中的物理地址
+	 */
     ram_addr_t offset;
     ram_addr_t used_length;
     ram_addr_t max_length;
@@ -261,6 +268,11 @@ static inline void cpu_physical_memory_set_dirty_flag(ram_addr_t addr,
     rcu_read_unlock();
 }
 
+/*
+ *
+ *
+ * 标记一段物理内存为dirty
+ */
 static inline void cpu_physical_memory_set_dirty_range(ram_addr_t start,
                                                        ram_addr_t length,
                                                        uint8_t mask)

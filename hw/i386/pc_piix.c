@@ -67,8 +67,8 @@ static const int ide_irq[MAX_IDE_BUS] = { 14, 15 };
  *
  * main()
  *  DEFINE_I440FX_MACHINE 定于出来的函数pc_init_##suffix()调用
- *   pc_init1(host_type=TYPE_I440FX_PCI_HOST_BRIDGE,
-              pci_type=TYPE_I440FX_PCI_DEVICE)
+ *   pc_init1(host_type=TYPE_I440FX_PCI_HOST_BRIDGE, //北桥的类型
+              pci_type=TYPE_I440FX_PCI_DEVICE //北桥对应的pci设备的名字 )
  */
 static void pc_init1(MachineState *machine,
                      const char *host_type, const char *pci_type)
@@ -159,7 +159,7 @@ static void pc_init1(MachineState *machine,
         }
     }
 
-    //创建cpu
+    //创建vCPU
     pc_cpus_init(pcms);
 
     if (kvm_enabled() && pcmc->kvmclock_enabled) {
@@ -188,6 +188,8 @@ static void pc_init1(MachineState *machine,
 
     /* allocate ram and load rom/bios */
     if (!xen_enabled()) { //走这里
+
+	    //内存初始化，这些host的虚拟内存会作为guest os的物理内存用
         pc_memory_init(pcms, system_memory,
                        rom_memory, &ram_memory);
     } else if (machine->kernel_filename != NULL) {
@@ -195,6 +197,7 @@ static void pc_init1(MachineState *machine,
         xen_load_linux(pcms);
     }
 
+	//下面是给PC进行中断初始化
     gsi_state = g_malloc0(sizeof(*gsi_state));
     if (kvm_ioapic_in_kernel()) { //走这里
         kvm_pc_setup_irq_routing(pcmc->pci_enabled);
@@ -205,6 +208,7 @@ static void pc_init1(MachineState *machine,
     }
 
     if (pcmc->pci_enabled) { //走这里
+        //i440fx主板初始化
         pci_bus = i440fx_init(host_type,
                               pci_type,
                               &i440fx_state, &piix3_devfn, &isa_bus, pcms->gsi,
@@ -234,7 +238,7 @@ static void pc_init1(MachineState *machine,
         gsi_state->i8259_irq[i] = i8259[i];
     }
     g_free(i8259);
-    if (pcmc->pci_enabled) {
+    if (pcmc->pci_enabled) { //初始化ioapic
         ioapic_init_gsi(gsi_state, "i440fx");
     }
 

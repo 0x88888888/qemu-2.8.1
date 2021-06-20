@@ -2016,6 +2016,10 @@ PCIDevice *pci_find_device(PCIBus *bus, int bus_num, uint8_t devfn)
     return bus->devices[devfn];
 }
 
+/*
+ * device_set_realized()
+ *  pci_qdev_realize()
+ */
 static void pci_qdev_realize(DeviceState *qdev, Error **errp)
 {
     PCIDevice *pci_dev = (PCIDevice *)qdev;
@@ -2584,6 +2588,10 @@ MemoryRegion *pci_address_space_io(PCIDevice *dev)
     return dev->bus->address_space_io;
 }
 
+/*
+ * type_initialize()
+ *  pci_device_class_init()
+ */
 static void pci_device_class_init(ObjectClass *klass, void *data)
 {
     DeviceClass *k = DEVICE_CLASS(klass);

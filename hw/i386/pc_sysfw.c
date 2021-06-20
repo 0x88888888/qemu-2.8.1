@@ -173,6 +173,12 @@ static void pc_system_flash_init(MemoryRegion *rom_memory)
     }
 }
 
+/*
+ * DEFINE_I440FX_MACHINE 定于出来的函数pc_init_##suffix()调用
+ *  pc_init1()
+ *   pc_memory_init()
+ *    old_pc_system_rom_init()
+ */
 static void old_pc_system_rom_init(MemoryRegion *rom_memory, bool isapc_ram_fw)
 {
     char *filename;
@@ -184,8 +190,11 @@ static void old_pc_system_rom_init(MemoryRegion *rom_memory, bool isapc_ram_fw)
     if (bios_name == NULL) {
         bios_name = BIOS_FILENAME;
     }
+
+	//读取bios.bin文件
     filename = qemu_find_file(QEMU_FILE_TYPE_BIOS, bios_name);
     if (filename) {
+		//文件长度
         bios_size = get_image_size(filename);
     } else {
         bios_size = -1;
@@ -195,11 +204,13 @@ static void old_pc_system_rom_init(MemoryRegion *rom_memory, bool isapc_ram_fw)
         goto bios_error;
     }
     bios = g_malloc(sizeof(*bios));
+	//创建pc.bios MemoryRegion	
     memory_region_init_ram(bios, NULL, "pc.bios", bios_size, &error_fatal);
     vmstate_register_ram_global(bios);
     if (!isapc_ram_fw) {
         memory_region_set_readonly(bios, true);
     }
+	//读取bios文件内容进来,添加到roms
     ret = rom_add_file_fixed(bios_name, (uint32_t)(-bios_size), -1);
     if (ret != 0) {
     bios_error:
@@ -230,13 +241,19 @@ static void old_pc_system_rom_init(MemoryRegion *rom_memory, bool isapc_ram_fw)
                                 bios);
 }
 
+/*
+ * DEFINE_I440FX_MACHINE 定于出来的函数pc_init_##suffix()调用
+ *  pc_init1()
+ *   pc_memory_init()
+ *
+ */
 void pc_system_firmware_init(MemoryRegion *rom_memory, bool isapc_ram_fw)
 {
     DriveInfo *pflash_drv;
 
     pflash_drv = drive_get(IF_PFLASH, 0, 0);
 
-    if (isapc_ram_fw || pflash_drv == NULL) {
+    if (isapc_ram_fw || pflash_drv == NULL) { //走这里
         /* When a pflash drive is not found, use rom-mode */
         old_pc_system_rom_init(rom_memory, isapc_ram_fw);
         return;

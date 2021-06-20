@@ -336,6 +336,9 @@ struct CPUState {
 
     CPUAddressSpace *cpu_ases;
     int num_ases;
+	/*
+	 * 内存地址空间
+	 */
     AddressSpace *as;
     MemoryRegion *memory;
 

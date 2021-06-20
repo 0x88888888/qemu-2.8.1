@@ -758,6 +758,7 @@ static void kvm_set_phys_mem(KVMMemoryListener *kml,
     KVMSlot *mem, old;
     int err;
     MemoryRegion *mr = section->mr;
+	//是否可以write
     bool writeable = !mr->readonly && !mr->rom_device;
     hwaddr start_addr = section->offset_within_address_space;
     ram_addr_t size = int128_get64(section->size);
@@ -789,9 +790,11 @@ static void kvm_set_phys_mem(KVMMemoryListener *kml,
         }
     }
 
+    //用mmap,得到host virtual address 
     ram = memory_region_get_ram_ptr(mr) + section->offset_within_region + delta;
 
     while (1) {
+		//查找和[start_addr, start_addr+size] 有overlap的 KVMSlot
         mem = kvm_lookup_overlapping_slot(kml, start_addr, start_addr + size);
         if (!mem) {
             break;
@@ -837,7 +840,7 @@ static void kvm_set_phys_mem(KVMMemoryListener *kml,
             mem->ram = old.ram;
             mem->flags = kvm_mem_flags(mr);
 
-            //这里
+            //这里 KVM_SET_USER_MEMORY_REGION
             err = kvm_set_user_memory_region(kml, mem);
             if (err) {
                 fprintf(stderr, "%s: error updating slot: %s\n", __func__,
@@ -859,7 +862,7 @@ static void kvm_set_phys_mem(KVMMemoryListener *kml,
             mem->ram = old.ram;
             mem->flags =  kvm_mem_flags(mr);
 
-            //这里
+            //这里 KVM_SET_USER_MEMORY_REGION
             err = kvm_set_user_memory_region(kml, mem);
             if (err) {
                 fprintf(stderr, "%s: error registering prefix slot: %s\n",
@@ -884,7 +887,7 @@ static void kvm_set_phys_mem(KVMMemoryListener *kml,
             mem->ram = old.ram + size_delta;
             mem->flags = kvm_mem_flags(mr);
 
-			//这里
+			//这里 KVM_SET_USER_MEMORY_REGION
             err = kvm_set_user_memory_region(kml, mem);
             if (err) {
                 fprintf(stderr, "%s: error registering suffix slot: %s\n",
@@ -907,7 +910,7 @@ static void kvm_set_phys_mem(KVMMemoryListener *kml,
     mem->ram = ram;
     mem->flags = kvm_mem_flags(mr);
 
-	//这里
+	//这里 KVM_SET_USER_MEMORY_REGION
     err = kvm_set_user_memory_region(kml, mem);
     if (err) {
         fprintf(stderr, "%s: error registering slot: %s\n", __func__,
@@ -916,12 +919,22 @@ static void kvm_set_phys_mem(KVMMemoryListener *kml,
     }
 }
 
+/*
+ * main() [vl.c]
+ *  configure_accelerator()
+ *   accel_init_machine()
+ *    kvm_init()
+ * 	   memory_listener_register()
+ * 	    listener_add_address_space()
+ *       kvm_region_add()
+ */
 static void kvm_region_add(MemoryListener *listener,
                            MemoryRegionSection *section)
 {
     KVMMemoryListener *kml = container_of(listener, KVMMemoryListener, listener);
 
     memory_region_ref(section->mr);
+	//更新到内核
     kvm_set_phys_mem(kml, section, true);
 }
 
@@ -1424,6 +1437,16 @@ int kvm_irqchip_update_msi_route(KVMState *s, int virq, MSIMessage msg,
     return kvm_update_routing_entry(s, &kroute);
 }
 
+/*
+ * vfio_add_kvm_msi_virq()
+ *  kvm_irqchip_add_irqfd_notifier_gsi()
+ *   kvm_irqchip_assign_irqfd()
+ *
+ * vfio_start_irqfd_injection()
+ *  kvm_irqchip_add_irqfd_notifier()
+ *   kvm_irqchip_add_irqfd_notifier_gsi()
+ *    kvm_irqchip_assign_irqfd()
+ */
 static int kvm_irqchip_assign_irqfd(KVMState *s, int fd, int rfd, int virq,
                                     bool assign)
 {
@@ -1542,6 +1565,14 @@ int kvm_irqchip_update_msi_route(KVMState *s, int virq, MSIMessage msg)
 }
 #endif /* !KVM_CAP_IRQ_ROUTING */
 
+/*
+ * vfio_add_kvm_msi_virq()
+ *  kvm_irqchip_add_irqfd_notifier_gsi()
+ *
+ * vfio_start_irqfd_injection()
+ *  kvm_irqchip_add_irqfd_notifier()
+ *   kvm_irqchip_add_irqfd_notifier_gsi()
+ */
 int kvm_irqchip_add_irqfd_notifier_gsi(KVMState *s, EventNotifier *n,
                                        EventNotifier *rn, int virq)
 {
@@ -1556,6 +1587,10 @@ int kvm_irqchip_remove_irqfd_notifier_gsi(KVMState *s, EventNotifier *n,
            false);
 }
 
+/*
+ * vfio_start_irqfd_injection()
+ *  kvm_irqchip_add_irqfd_notifier()
+ */
 int kvm_irqchip_add_irqfd_notifier(KVMState *s, EventNotifier *n,
                                    EventNotifier *rn, qemu_irq irq)
 {

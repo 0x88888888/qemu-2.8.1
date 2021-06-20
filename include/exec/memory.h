@@ -216,6 +216,9 @@ struct MemoryRegion {
     bool flush_coalesced_mmio;
     bool global_locking;
     uint8_t dirty_log_mask;
+	/*
+	 * 表示实际在Host上分配的物理内存
+	 */
     RAMBlock *ram_block;
     Object *owner;
     const MemoryRegionIOMMUOps *iommu_ops;
@@ -234,7 +237,8 @@ struct MemoryRegion {
     void (*destructor)(MemoryRegion *mr);
     uint64_t align;
 	/*
-	 * 表示MemoryRegion是否是叶子节点
+	 * 表示MemoryRegion是否是叶子节点,
+	 * AddressSpace->root这颗MemoryRegion树只有叶子节点才表示是分配给虚拟机的物理内存或者是MMIO
 	 */
     bool terminates;
     bool ram_device;
@@ -245,8 +249,12 @@ struct MemoryRegion {
     hwaddr alias_offset;
 	/*
 	 * 优先级
-	 * 一般情况下,当解析一个地址时，只会落入一个MemoryRegion,但是当MemoryRegion重合时，
+	 * 一般情况下,MemoryRegion不会重合，但是有时候让MemoryRegion重合比较有用。
+	 * 当解析一个地址时，只会落入一个MemoryRegion,但是当MemoryRegion重合时，
 	 * 需要有一种机制决定到底让哪一个VM可见，这就是priority的作用了
+	 *
+	 * memory_region_add_subregion_overlap用来将一个MemoryRegion添加到一个container中去
+	 * 允许其重复,当重复的时候，谁的priority大谁就能被虚拟机看见
 	 */
     int32_t priority;
 	/*
@@ -284,9 +292,15 @@ struct MemoryListener {
     void (*begin)(MemoryListener *listener);
 	//执行内存变更时,memory_region_transaction_commit中调用
     void (*commit)(MemoryListener *listener);
-	//kvm_region_add, 在添加region的时候被调用
+	/*
+	 * kvm_region_add, 
+	 * 在添加region的时候被调用
+	 */
     void (*region_add)(MemoryListener *listener, MemoryRegionSection *section);
-	//kvm_region_del, address_space_update_topology_pass中调用
+	/*
+	 * kvm_region_del, 
+	 * address_space_update_topology_pass中调用
+	 */
     void (*region_del)(MemoryListener *listener, MemoryRegionSection *section);
 	//address_space_update_topology_pass中调用
     void (*region_nop)(MemoryListener *listener, MemoryRegionSection *section);
@@ -317,7 +331,12 @@ struct MemoryListener {
                                hwaddr addr, hwaddr len);
     void (*coalesced_mmio_del)(MemoryListener *listener, MemoryRegionSection *section,
                                hwaddr addr, hwaddr len);
-    /* Lower = earlier (during add), later (during del) */
+    /* Lower = earlier (during add), later (during del) 
+     *
+     * lower ==在add的时候优先级高
+     * lower ==在del的时候优先级低
+     * 默认10
+	 */
     unsigned priority;
 	//表示本listener监听的AddressSpace这个物理地址空间
     AddressSpace *address_space;
@@ -334,12 +353,17 @@ struct MemoryListener {
  * address_space_memory
  * address_space_io
  *
+ * CPUState->as
  */
 struct AddressSpace {
     /* All fields are private. */
     struct rcu_head rcu;
     char *name;
-	//树形结构
+	/*
+	 * 树形结构
+	 * 这颗MemoryRegion树只有叶子节点才表示是分配给虚拟机的物理内存或者是MMIO
+	 * 中间节点则表示内存总线
+	 */
     MemoryRegion *root;
     int ref_count;
     bool malloced;
@@ -347,7 +371,7 @@ struct AddressSpace {
     /*
      *　Accessed via RCU.  
      *
-     * 
+     * root flat化
 	 */
     struct FlatView *current_map;
 

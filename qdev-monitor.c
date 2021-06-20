@@ -212,6 +212,8 @@ static const char *find_typename_by_alias(const char *alias)
  *   device_init_func()
  *    qdev_device_add()
  *     qdev_get_device_class()
+ *
+ * 以*driver为name,从type_table中得到TypeImpl,返回TypeImpl->class
  */
 static DeviceClass *qdev_get_device_class(const char **driver, Error **errp)
 {
@@ -219,6 +221,7 @@ static DeviceClass *qdev_get_device_class(const char **driver, Error **errp)
     DeviceClass *dc;
     const char *original_name = *driver;
 
+    //得到TypeImpl->class,*driver为TypeImpl->name
     oc = object_class_by_name(*driver);
     if (!oc) {
         const char *typename = find_typename_by_alias(*driver);
@@ -245,6 +248,7 @@ static DeviceClass *qdev_get_device_class(const char **driver, Error **errp)
         return NULL;
     }
 
+    //类型转一下
     dc = DEVICE_CLASS(oc);
     if (dc->cannot_instantiate_with_device_add_yet ||
         (qdev_hotplug && !dc->hotpluggable)) {

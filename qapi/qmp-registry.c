@@ -27,6 +27,7 @@ void qmp_register_command(const char *name, QmpCommandFunc *fn,
     cmd->fn = fn;
     cmd->enabled = true;
     cmd->options = options;
+	//所有的command都在这里
     QTAILQ_INSERT_TAIL(&qmp_commands, cmd, node);
 }
 

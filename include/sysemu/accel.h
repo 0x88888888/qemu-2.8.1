@@ -38,6 +38,7 @@ typedef struct AccelClass {
     const char *opt_name;
     const char *name;
     int (*available)(void);
+	//kvm_init
     int (*init_machine)(MachineState *ms);
     bool *allowed;
 } AccelClass;

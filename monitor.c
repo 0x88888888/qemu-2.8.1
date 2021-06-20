@@ -998,8 +998,10 @@ static void qmp_init_marshal(void)
 {
     qmp_register_command("query-qmp-schema", qmp_query_qmp_schema,
                          QCO_NO_OPTIONS);
+	//添加设备
     qmp_register_command("device_add", qmp_device_add,
                          QCO_NO_OPTIONS);
+	//添加netdev设备
     qmp_register_command("netdev_add", qmp_netdev_add,
                          QCO_NO_OPTIONS);
 
@@ -3723,6 +3725,13 @@ static QDict *qmp_check_input_obj(QObject *input_obj, Error **errp)
     return input_dict;
 }
 
+/*
+ * main()[vl.c]
+ *  mon_init_func()
+ *   monitor_init()
+ *    ......
+ *     handle_qmp_command()
+ */
 static void handle_qmp_command(JSONMessageParser *parser, GQueue *tokens)
 {
     QObject *req, *rsp = NULL, *id = NULL;
@@ -3868,6 +3877,12 @@ static void monitor_qmp_event(void *opaque, int event)
     }
 }
 
+/*
+ * main()[vl.c]
+ *  mon_init_func()
+ *   monitor_init()
+ *    monitor_event()
+ */
 static void monitor_event(void *opaque, int event)
 {
     Monitor *mon = opaque;
@@ -3981,6 +3996,11 @@ static void __attribute__((constructor)) monitor_lock_init(void)
     qemu_mutex_init(&monitor_lock);
 }
 
+/*
+ * main()[vl.c]
+ *  mon_init_func()
+ *   monitor_init()
+ */
 void monitor_init(CharDriverState *chr, int flags)
 {
     static int is_first_init = 1;
@@ -4005,7 +4025,8 @@ void monitor_init(CharDriverState *chr, int flags)
         monitor_read_command(mon, 0);
     }
 
-    if (monitor_is_qmp(mon)) {
+    //设置monitor的回调函数
+    if (monitor_is_qmp(mon)) { //走这里
         qemu_chr_fe_set_handlers(&mon->chr, monitor_can_read, monitor_qmp_read,
                                  monitor_qmp_event, mon, NULL, true);
         qemu_chr_fe_set_echo(&mon->chr, true);

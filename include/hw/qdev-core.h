@@ -145,6 +145,13 @@ typedef struct DeviceClass {
 
     /* callbacks */
     void (*reset)(DeviceState *dev);
+	/*
+	 * 通常是device_realize
+	 * pci_qdev_realize,pci_default_realize
+	 * VirtioPCIClass在virtio_pci_class_init中设置这个realize=virtio_pci_realize
+	 *
+	 * DeviceClass子类有其自己的realize成员，比如VirtioDeviceClass->realize
+	 */
     DeviceRealize realize;
     DeviceUnrealize unrealize;
 

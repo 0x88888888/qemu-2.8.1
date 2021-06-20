@@ -218,6 +218,10 @@ void device_listener_unregister(DeviceListener *listener)
     QTAILQ_REMOVE(&device_listeners, listener, link);
 }
 
+/*
+ * device_set_realized()
+ *  device_realize()
+ */
 static void device_realize(DeviceState *dev, Error **errp)
 {
     DeviceClass *dc = DEVICE_GET_CLASS(dev);
@@ -908,6 +912,7 @@ static void device_set_realized(Object *obj, bool value, Error **errp)
         return;
     }
 
+ 
     if (value && !dev->realized) {
         if (!obj->parent) {
             gchar *name = g_strdup_printf("device[%d]", unattached_count++);
@@ -927,6 +932,11 @@ static void device_set_realized(Object *obj, bool value, Error **errp)
             }
         }
 
+        /*
+         * 通常是device_realize
+         *
+         * PCIDeviceClass->realize==pci_qdev_realize
+         */
         if (dc->realize) {
             dc->realize(dev, &local_err);
         }

@@ -1082,6 +1082,7 @@ static int subpage_register (subpage_t *mmio, uint32_t start, uint32_t end,
                              uint16_t section);
 static subpage_t *subpage_init(AddressSpace *as, hwaddr base);
 
+//qemu_anon_ram_alloc
 static void *(*phys_mem_alloc)(size_t size, uint64_t *align) =
                                qemu_anon_ram_alloc;
 
@@ -1092,6 +1093,7 @@ static void *(*phys_mem_alloc)(size_t size, uint64_t *align) =
  */
 void phys_mem_set_alloc(void *(*alloc)(size_t, uint64_t *align))
 {
+    //qemu_anon_ram_alloc
     phys_mem_alloc = alloc;
 }
 
@@ -1399,11 +1401,13 @@ static ram_addr_t find_ram_offset(ram_addr_t size)
         end = block->offset + block->max_length;
 
         QLIST_FOREACH_RCU(next_block, &ram_list.blocks, next) {
+			//next为插入这个RAMBlock->offset的下一处值
             if (next_block->offset >= end) {
                 next = MIN(next, next_block->offset);
             }
         }
-        if (next - end >= size && next - end < mingap) {
+		
+        if (next - end >= size && next - end < mingap) {//表明end处这个offset可以插入
             offset = end;
             mingap = next - end;
         }
@@ -1592,6 +1596,12 @@ static void dirty_memory_extend(ram_addr_t old_ram_size,
     }
 }
 
+/* 
+ * memory_region_init_ram()
+ *	qemu_ram_alloc()
+ *	 qemu_ram_alloc_internal()
+ *    ram_block_add()
+ */
 static void ram_block_add(RAMBlock *new_block, Error **errp)
 {
     RAMBlock *block;
@@ -1602,6 +1612,7 @@ static void ram_block_add(RAMBlock *new_block, Error **errp)
     old_ram_size = last_ram_offset() >> TARGET_PAGE_BITS;
 
     qemu_mutex_lock_ramlist();
+	//遍历ram_list,确定本RAMBlock的offset
     new_block->offset = find_ram_offset(new_block->max_length);
 
     if (!new_block->host) {
@@ -1613,7 +1624,9 @@ static void ram_block_add(RAMBlock *new_block, Error **errp)
                 qemu_mutex_unlock_ramlist();
                 return;
             }
-        } else {
+        } else {//这里
+            //调用mmap去分配host的虚拟地址，记录到new_block->host
+                              //qemu_anon_ram_alloc
             new_block->host = phys_mem_alloc(new_block->max_length,
                                              &new_block->mr->align);
             if (!new_block->host) {
@@ -1627,15 +1640,20 @@ static void ram_block_add(RAMBlock *new_block, Error **errp)
         }
     }
 
+    //新的总的物理内存的大小
     new_ram_size = MAX(old_ram_size,
               (new_block->offset + new_block->max_length) >> TARGET_PAGE_BITS);
-    if (new_ram_size > old_ram_size) {
+	
+    if (new_ram_size > old_ram_size) {//重新计算dirty memory bitmap的大小
         migration_bitmap_extend(old_ram_size, new_ram_size);
         dirty_memory_extend(old_ram_size, new_ram_size);
     }
     /* Keep the list sorted from biggest to smallest block.  Unlike QTAILQ,
      * QLIST (which has an RCU-friendly variant) does not have insertion at
      * tail, so save the last element in last_block.
+     *
+     * 插入到ram_list中去
+     *
      */
     QLIST_FOREACH_RCU(block, &ram_list.blocks, next) {
         last_block = block;
@@ -1657,6 +1675,9 @@ static void ram_block_add(RAMBlock *new_block, Error **errp)
     ram_list.version++;
     qemu_mutex_unlock_ramlist();
 
+    /*
+     * 设置新加的RAMBlock全部为脏页
+     */
     cpu_physical_memory_set_dirty_range(new_block->offset,
                                         new_block->used_length,
                                         DIRTY_CLIENTS_ALL);
@@ -2460,6 +2481,9 @@ void address_space_destroy_dispatch(AddressSpace *as)
  * main() [vl.c]
  *  cpu_exec_init_all()
  *   memory_map_init()
+ *
+ * address_space_memory->root = system_memory
+ * address_space_io->root = system_io 
  */
 static void memory_map_init(void)
 {
@@ -2946,8 +2970,16 @@ void cpu_exec_init_all(void)
      * up front what their requirements are.
      */
     finalize_target_page_bits();
-	
+
+	/*
+	 * 初始化io_mem_rom, io_mem_unassigned,
+	 *       io_mem_notdirty, io_mem_watch 这几个全局MemoryRegion
+	 */
     io_mem_init();
+	/* 
+	 * address_space_memory->root= system_memory
+	 * address_space_io->root= system_io
+	 */
     memory_map_init();
     qemu_mutex_init(&map_client_list_lock);
 }

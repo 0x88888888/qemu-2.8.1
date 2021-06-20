@@ -62,6 +62,15 @@ static QDict *qmp_dispatch_check_obj(const QObject *request, Error **errp)
     return dict;
 }
 
+/*
+ * main()[vl.c]
+ *  mon_init_func()
+ *   monitor_init()
+ *    ......
+ *     handle_qmp_command()
+ *      qmp_dispatch()
+ *       do_qmp_dispatch()
+ */
 static QObject *do_qmp_dispatch(QObject *request, Error **errp)
 {
     Error *local_err = NULL;
@@ -95,6 +104,7 @@ static QObject *do_qmp_dispatch(QObject *request, Error **errp)
         QINCREF(args);
     }
 
+    //执行了
     cmd->fn(args, &ret, &local_err);
     if (local_err) {
         error_propagate(errp, local_err);
@@ -116,6 +126,14 @@ QObject *qmp_build_error_object(Error *err)
                               error_get_pretty(err));
 }
 
+/*
+ * main()[vl.c]
+ *  mon_init_func()
+ *   monitor_init()
+ *    ......
+ *     handle_qmp_command()
+ *      qmp_dispatch()
+ */
 QObject *qmp_dispatch(QObject *request)
 {
     Error *err = NULL;

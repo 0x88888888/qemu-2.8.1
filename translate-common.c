@@ -54,5 +54,6 @@ static void tcg_handle_interrupt(CPUState *cpu, int mask)
     }
 }
 
+//kvm_handle_interrupt
 CPUInterruptHandler cpu_interrupt_handler = tcg_handle_interrupt;
 #endif

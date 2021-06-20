@@ -72,7 +72,8 @@ static int accel_init_machine(AccelClass *acc, MachineState *ms)
     int ret;
     ms->accelerator = accel;
     *(acc->allowed) = true;
-	//kvm_init
+	
+	//kvm_init,打开 /dev/kvm,创建vm
     ret = acc->init_machine(ms);
     if (ret < 0) {
         ms->accelerator = NULL;

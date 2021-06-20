@@ -56,15 +56,31 @@ struct TypeImpl
     //从TypeInfo->name赋值
     const char *name;
 
-    //从TypeInfo->class_size赋值
+    /*
+     * 从TypeInfo->class_size赋值
+     *
+     * 在type_initialize中ti->class=g_malloc0(ti->class_size)
+     */
     size_t class_size;
 
-	//从TypeInfo->instance_size赋值
+	/*
+	 * 从TypeInfo->instance_size赋值
+	 * 在object_new_with_type(), obj = g_malloc(type->instance_size)
+	 */
     size_t instance_size;
 
-    //从TypeInfo->class_init赋值
+    /* 
+     * 从TypeInfo->class_init赋值
+     * 在type_initialize()中调用
+     * 去init XXXClass 这个对象
+     */
     void (*class_init)(ObjectClass *klass, void *data);
-	//从TypeInfo->class_base_init赋值
+	/*
+	 * 从TypeInfo->class_base_init赋值
+	 * type_initialize()中调用
+	 *
+	 * 在子类 initialize的时候，调用parent_type->class_base_init
+	 */
     void (*class_base_init)(ObjectClass *klass, void *data);
 	//从TypeInfo->class_finalize赋值
     void (*class_finalize)(ObjectClass *klass, void *data);
@@ -72,7 +88,11 @@ struct TypeImpl
     //从TypeInfo->class_data赋值
     void *class_data;
 
-    //从TypeInfo->instance_init赋值
+    /*
+     * 从TypeInfo->instance_init赋值
+     *
+     * object_init_with_type()中调用
+     */
     void (*instance_init)(Object *obj);
 	//从TypeInfo->instance_post_init赋值
     void (*instance_post_init)(Object *obj);
@@ -91,6 +111,8 @@ struct TypeImpl
      * 在type_initialize中ti->class=g_malloc0(ti->class_size)
      *
      * class指向PCIDeviceClass 之类的
+     *
+     * TypeImpl所代表的XXXClass 对象,每个TypeImpl只有这么一个XXXClass对象
      */
     ObjectClass *class;
 
@@ -368,22 +390,24 @@ static void type_initialize(TypeImpl *ti)
         return;
     }
 
-    //类型大小
+    //struct XXXClass 结构的大小
     ti->class_size = type_class_get_size(ti);
 	//如果之类的type->instance_size == 0 就返回父类的
     ti->instance_size = type_object_get_size(ti);
 
-	//实例话出来class对象
+	//实例化出来XXXClass对象
     ti->class = g_malloc0(ti->class_size);
 
-    //得到父类
+    //得到ti->parent_type
     parent = type_get_parent(ti);
     if (parent) {//递归起来,initialize父类
         type_initialize(parent);
         GSList *e;
         int i;
 
+        //parent->class_size <=  ti->class_size 必须要成立哦
         g_assert_cmpint(parent->class_size, <=, ti->class_size);
+		//把父类的信息copy过来
         memcpy(ti->class, parent->class, parent->class_size);
         ti->class->interfaces = NULL;
         ti->class->properties = g_hash_table_new_full(
@@ -419,6 +443,9 @@ static void type_initialize(TypeImpl *ti)
             g_str_hash, g_str_equal, g_free, object_property_free);
     }
 
+    /*
+     * 将TypeImpl对象和XXXClass对象关联起来
+     */
     ti->class->type = ti;
 
     while (parent) {
@@ -428,8 +455,12 @@ static void type_initialize(TypeImpl *ti)
         parent = type_get_parent(parent);
     }
 
-    if (ti->class_init) {
-		//x86_cpu_common_class_init
+    if (ti->class_init) {//最后一步,去init XXXClass对象
+		/*
+		 * x86_cpu_common_class_init
+		 *
+		 * TypeImpl->class_init 来自与TypeInfo->class_init
+		*/
         ti->class_init(ti->class, ti->class_data);
     }
 }
@@ -441,11 +472,14 @@ static void type_initialize(TypeImpl *ti)
  */
 static void object_init_with_type(Object *obj, TypeImpl *ti)
 {
-    if (type_has_parent(ti)) {
+    if (type_has_parent(ti)) {//去init obj的parent部分
         object_init_with_type(obj, type_get_parent(ti));
     }
 
     if (ti->instance_init) {
+		/*
+		 * TypeImpl->instance_init来自与TypeInfo->instance_init
+		 */
         ti->instance_init(obj);
     }
 }
@@ -483,6 +517,7 @@ void object_initialize_with_type(void *data, size_t size, TypeImpl *type)
     Object *obj = data;
 
     g_assert(type != NULL);
+	//确保obj对应的TypeImpl已经initialize
     type_initialize(type);
 
     g_assert_cmpint(type->instance_size, >=, sizeof(Object));
@@ -495,6 +530,8 @@ void object_initialize_with_type(void *data, size_t size, TypeImpl *type)
     object_ref(obj);
     obj->properties = g_hash_table_new_full(g_str_hash, g_str_equal,
                                             NULL, object_property_free);
+
+    //去init object											
     object_init_with_type(obj, type);
     object_post_init_with_type(obj, type);
 }
@@ -616,7 +653,8 @@ Object *object_new_with_type(Type type)
 
     //给instance分配内存
     obj = g_malloc(type->instance_size);
-	
+
+	//去initialize object
     object_initialize_with_type(obj, type->instance_size, type);
     obj->free = g_free;
 

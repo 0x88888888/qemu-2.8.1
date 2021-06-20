@@ -439,9 +439,10 @@ static void allocate_system_memory_nonnuma(MemoryRegion *mr, Object *owner,
         fprintf(stderr, "-mem-path not supported on this host\n");
         exit(1);
 #endif
-    } else {
+    } else { //走这里
         memory_region_init_ram(mr, owner, name, ram_size, &error_fatal);
     }
+	
     vmstate_register_ram_global(mr);
 }
 
@@ -458,7 +459,7 @@ void memory_region_allocate_system_memory(MemoryRegion *mr, Object *owner,
     uint64_t addr = 0;
     int i;
 
-    if (nb_numa_nodes == 0 || !have_memdevs) { //非numa
+    if (nb_numa_nodes == 0 || !have_memdevs) { //走这里,非numa
         allocate_system_memory_nonnuma(mr, owner, name, ram_size);
         return;
     }

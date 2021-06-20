@@ -623,6 +623,16 @@ static void handle_a20_line_change(void *opaque, int irq, int level)
     x86_cpu_set_a20(cpu, level);
 }
 
+/*
+ * DEFINE_I440FX_MACHINE 定于出来的函数pc_init_##suffix()调用
+ *  pc_init1()
+ *   pc_memory_init()
+ *    e820_add_entry()
+ *
+ * 放到e820_table中去
+ *
+ * 内存初始化，这些host的虚拟内存会作为guest os的物理内存用
+ */
 int e820_add_entry(uint64_t address, uint64_t length, uint32_t type)
 {
     int index = le32_to_cpu(e820_reserve.count);
@@ -737,6 +747,13 @@ static void pc_build_smbios(FWCfgState *fw_cfg)
     }
 }
 
+/*
+ * DEFINE_I440FX_MACHINE 定于出来的函数pc_init_##suffix()调用
+ *  pc_init1()
+ *   pc_memory_init()
+ *    bochs_bios_init(as=address_space_memory)
+ */
+
 static FWCfgState *bochs_bios_init(AddressSpace *as, PCMachineState *pcms)
 {
     FWCfgState *fw_cfg;
@@ -744,6 +761,7 @@ static FWCfgState *bochs_bios_init(AddressSpace *as, PCMachineState *pcms)
     int i, j;
 
     fw_cfg = fw_cfg_init_io_dma(FW_CFG_IO_BASE, FW_CFG_IO_BASE + 4, as);
+	
     fw_cfg_add_i16(fw_cfg, FW_CFG_NB_CPUS, pcms->boot_cpus);
 
     /* FW_CFG_MAX_CPUS is a bit confusing/problematic on x86:
@@ -1321,7 +1339,15 @@ void pc_guest_info_init(PCMachineState *pcms)
     qemu_add_machine_init_done_notifier(&pcms->machine_done);
 }
 
-/* setup pci memory address space mapping into system address space */
+/* setup pci memory address space mapping into system address space
+ *
+ * DEFINE_I440FX_MACHINE 定于出来的函数pc_init_##suffix()调用
+ *  pc_init1()
+ *   i440fx_init(address_space_mem==system_memory,address_space_io==system_io)
+ *    pc_pci_as_mapping_init()
+ *
+ * 建立pci地址空间和物理内存地址空间的映射关系
+ */
 void pc_pci_as_mapping_init(Object *owner, MemoryRegion *system_memory,
                             MemoryRegion *pci_address_space)
 {
@@ -1384,10 +1410,11 @@ void xen_load_linux(PCMachineState *pcms)
  *  pc_init1()
  *   pc_memory_init()
  *
- *内存初始化
+ *
+ * 内存初始化，这些host的虚拟内存会作为guest os的物理内存用
  */
 void pc_memory_init(PCMachineState *pcms,
-                    MemoryRegion *system_memory,
+                    MemoryRegion *system_memory /* 实参为全局变量system_memory */,
                     MemoryRegion *rom_memory,
                     MemoryRegion **ram_memory)
 {
@@ -1409,22 +1436,34 @@ void pc_memory_init(PCMachineState *pcms,
      */
      //分配虚拟机物理内存RAM
     ram = g_malloc(sizeof(*ram));
+	//初始化ram
     memory_region_allocate_system_memory(ram, NULL, "pc.ram",
                                          machine->ram_size);
     *ram_memory = ram;
     ram_below_4g = g_malloc(sizeof(*ram_below_4g));
+	
     memory_region_init_alias(ram_below_4g, NULL, "ram-below-4g", ram,
                              0, pcms->below_4g_mem_size);
+	//添加ram_below_4g到system_memory->root中去
     memory_region_add_subregion(system_memory, 0, ram_below_4g);
-	//将小于4g的物理内存加到 /etc/e820表中供BIOS使用
+	/*
+	 * 将小于4g的物理内存加到 /etc/e820表中供BIOS使用
+	 *
+	 * 放到e820_table中去
+	 */
     e820_add_entry(0, pcms->below_4g_mem_size, E820_RAM);
-    if (pcms->above_4g_mem_size > 0) {
+	
+    if (pcms->above_4g_mem_size > 0) {//有4G以上的物理内存
         ram_above_4g = g_malloc(sizeof(*ram_above_4g));
         memory_region_init_alias(ram_above_4g, NULL, "ram-above-4g", ram,
                                  pcms->below_4g_mem_size,
                                  pcms->above_4g_mem_size);
+	    //添加ram_above_4g到system_memory->root树中去
         memory_region_add_subregion(system_memory, 0x100000000ULL,
                                     ram_above_4g);
+		/*
+		 * 也放到e820_table中去
+		 */
         e820_add_entry(0x100000000ULL, pcms->above_4g_mem_size, E820_RAM);
     }
 
@@ -1474,11 +1513,15 @@ void pc_memory_init(PCMachineState *pcms,
 
         memory_region_init(&pcms->hotplug_memory.mr, OBJECT(pcms),
                            "hotplug-memory", hotplug_mem_size);
+		//添加到system_memory->root树中去
         memory_region_add_subregion(system_memory, pcms->hotplug_memory.base,
                                     &pcms->hotplug_memory.mr);
     }
 
-    /* Initialize PC system firmware */
+    /* Initialize PC system firmware 
+     *
+     * 加载BIOS
+	 */
     pc_system_firmware_init(rom_memory, !pcmc->pci_enabled);
 
     option_rom_mr = g_malloc(sizeof(*option_rom_mr));
@@ -1490,8 +1533,12 @@ void pc_memory_init(PCMachineState *pcms,
                                         option_rom_mr,
                                         1);
 
+    // 创建fw_cfg设备
     fw_cfg = bochs_bios_init(&address_space_memory, pcms);
 
+    /*
+     * 全局变量fw_cfg=fw_cfg
+     */
     rom_set_fw(fw_cfg);
 
     if (pcmc->has_reserved_memory && pcms->hotplug_memory.base) {
@@ -1506,7 +1553,7 @@ void pc_memory_init(PCMachineState *pcms,
         fw_cfg_add_file(fw_cfg, "etc/reserved-memory-end", val, sizeof(*val));
     }
 
-    if (linux_boot) {
+    if (linux_boot) { //加载内核到指定位置
         load_linux(pcms, fw_cfg);
     }
 
@@ -1705,6 +1752,13 @@ void pc_pci_device_init(PCIBus *pci_bus)
     }
 }
 
+/*
+ * main()
+ *  DEFINE_I440FX_MACHINE 定于出来的函数pc_init_##suffix()调用
+ *   pc_init1(host_type=TYPE_I440FX_PCI_HOST_BRIDGE, //北桥的类型
+			 pci_type=TYPE_I440FX_PCI_DEVICE //北桥对应的pci设备的名字 )
+ *    ioapic_init_gsi() 			 
+ */
 void ioapic_init_gsi(GSIState *gsi_state, const char *parent_name)
 {
     DeviceState *dev;
@@ -1722,6 +1776,7 @@ void ioapic_init_gsi(GSIState *gsi_state, const char *parent_name)
     }
     qdev_init_nofail(dev);
     d = SYS_BUS_DEVICE(dev);
+	//应谁mmio地址空间
     sysbus_mmio_map(d, 0, IO_APIC_DEFAULT_ADDRESS);
 
     for (i = 0; i < IOAPIC_NUM_PINS; i++) {

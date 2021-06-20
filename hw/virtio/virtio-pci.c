@@ -1722,6 +1722,10 @@ static void virtio_pci_device_unplugged(DeviceState *d)
     }
 }
 
+/*
+ * device_set_realized()
+ *  virtio_pci_realize()
+ */
 static void virtio_pci_realize(PCIDevice *pci_dev, Error **errp)
 {
     VirtIOPCIProxy *proxy = VIRTIO_PCI(pci_dev);
@@ -2155,6 +2159,10 @@ static void virtio_balloon_pci_realize(VirtIOPCIProxy *vpci_dev, Error **errp)
     object_property_set_bool(OBJECT(vdev), true, "realized", errp);
 }
 
+/*
+ * type_initialize()
+ *  virtio_balloon_pci_class_init()
+ */
 static void virtio_balloon_pci_class_init(ObjectClass *klass, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
@@ -2169,6 +2177,12 @@ static void virtio_balloon_pci_class_init(ObjectClass *klass, void *data)
     pcidev_k->class_id = PCI_CLASS_OTHERS;
 }
 
+/*
+ * object_initialize()
+ *  object_initialize_with_type()
+ *   object_init_with_type()
+ *    virtio_balloon_pci_instance_init()
+ */
 static void virtio_balloon_pci_instance_init(Object *obj)
 {
     VirtIOBalloonPCI *dev = VIRTIO_BALLOON_PCI(obj);
