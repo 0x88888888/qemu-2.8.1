@@ -530,11 +530,12 @@ e1000_send_packet(E1000State *s, const uint8_t *buf, int size)
     static const int PTCregs[6] = { PTC64, PTC127, PTC255, PTC511,
                                     PTC1023, PTC1522 };
 
+    //得到前端网卡的NetClientState
     NetClientState *nc = qemu_get_queue(s->nic);
     if (s->phy_reg[PHY_CTRL] & MII_CR_LOOPBACK) { //配置了loopback模式
 		
         nc->info->receive(nc, buf, size);
-    } else { //走这里
+    } else { //走这里，发包
         qemu_send_packet(nc, buf, size);
     }
     inc_tx_bcast_or_mcast_count(s, buf);
@@ -1611,6 +1612,15 @@ static void e1000_write_config(PCIDevice *pci_dev, uint32_t address,
     }
 }
 
+/*
+ * main() [vl.c]
+ *  pc_init1()
+ *   pc_nic_init()
+ *    pci_nic_init_nofail()
+ *     ......
+ *      pci_qdev_realize()
+ *       pci_e1000_realize()
+ */
 static void pci_e1000_realize(PCIDevice *pci_dev, Error **errp)
 {
     DeviceState *dev = DEVICE(pci_dev);
@@ -1632,10 +1642,12 @@ static void pci_e1000_realize(PCIDevice *pci_dev, Error **errp)
 
     e1000_mmio_setup(d);
 
+    //设置pci_dev的 0号base address register
     pci_register_bar(pci_dev, 0, PCI_BASE_ADDRESS_SPACE_MEMORY, &d->mmio);
-
+    //设置pci_dev的 1号base address register
     pci_register_bar(pci_dev, 1, PCI_BASE_ADDRESS_SPACE_IO, &d->io);
 
+    //设置网卡mac地址
     qemu_macaddr_default_if_unset(&d->conf.macaddr);
     macaddr = d->conf.macaddr.a;
 
@@ -1645,6 +1657,7 @@ static void pci_e1000_realize(PCIDevice *pci_dev, Error **errp)
                                PCI_DEVICE_GET_CLASS(pci_dev)->device_id,
                                macaddr);
 
+    //分配NICState
     d->nic = qemu_new_nic(&net_e1000_info, &d->conf,
                           object_get_typename(OBJECT(d)), dev->id, d);
 

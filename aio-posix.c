@@ -322,6 +322,7 @@ bool aio_dispatch(AioContext *ctx)
             (revents & (G_IO_IN | G_IO_HUP | G_IO_ERR)) &&
             aio_node_check(ctx, node->is_external) &&
             node->io_read) {
+            //tap_send
             node->io_read(node->opaque);
 
             /* aio_notify() does not count as progress */

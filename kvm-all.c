@@ -780,7 +780,7 @@ static void kvm_set_phys_mem(KVMMemoryListener *kml,
         return;
     }
 
-    if (!memory_region_is_ram(mr)) {//MMIO这种内存不是RAM
+    if (!memory_region_is_ram(mr)) {//MMIO这种内存不是RAM,不需要mmap了
         if (writeable || !kvm_readonly_mem_allowed) {
             return;
         } else if (!mr->romd_mode) {

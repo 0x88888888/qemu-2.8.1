@@ -87,8 +87,12 @@ struct VirtIODevice
     uint64_t host_features;
 	//配置信息长度
     size_t config_len;
+	//配置信息的内存空间
     void *config;
+	
+	//msix用
     uint16_t config_vector;
+	
     uint32_t generation;
     int nvectors;
 	//虚拟队列，块设备只有一个
@@ -99,7 +103,9 @@ struct VirtIODevice
     VMChangeStateEntry *vmstate;
     char *bus_name;
     uint8_t device_endian;
+	//与irqfd有关系
     bool use_guest_notifier_mask;
+	
     QLIST_HEAD(, VirtQueue) *vector_queues;
 };
 

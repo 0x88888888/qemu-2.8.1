@@ -271,6 +271,18 @@ static void qemu_net_client_setup(NetClientState *nc,
     QTAILQ_INIT(&nc->filters);
 }
 
+/*
+ * main() [vl.c]
+ *  net_init_clients() 
+ *   net_init_client() 处理-net参数
+ *    net_client_init()
+ *     net_client_init1()
+ *      net_init_tap()
+ *       net_init_tap()
+ *        net_init_tap_one(model="tap")
+ *         net_tap_fd_init()
+ *          qemu_new_net_client()
+ */
 NetClientState *qemu_new_net_client(NetClientInfo *info,
                                     NetClientState *peer,
                                     const char *model,
@@ -310,6 +322,9 @@ NICState *qemu_new_nic(NetClientInfo *info,
     nic->opaque = opaque;
 
     for (i = 0; i < queues; i++) {
+		/*
+		 *
+		 */
         qemu_net_client_setup(&nic->ncs[i], info, peers[i], model, name,
                               NULL);
         nic->ncs[i].queue_index = i;
@@ -564,6 +579,7 @@ static ssize_t filter_receive_iov(NetClientState *nc,
     ssize_t ret = 0;
     NetFilterState *nf = NULL;
 
+    //遍历
     if (direction == NET_FILTER_DIRECTION_TX) {
         QTAILQ_FOREACH(nf, &nc->filters, next) {
             ret = qemu_netfilter_receive(nf, direction, sender, flags, iov,
@@ -644,7 +660,11 @@ void qemu_flush_queued_packets(NetClientState *nc)
  * 	   e1000_send_packet()
  * 	    qemu_send_packet()
  *       qemu_send_packet_async()
- *        qemu_send_packet_async_with_flags()
+ *        qemu_send_packet_async_with_flags(flags=QEMU_NET_PACKET_FLAG_NONE)
+ *
+ * tap_send()
+ *  qemu_send_packet_async()
+ *   qemu_send_packet_async_with_flags()
  */
 static ssize_t qemu_send_packet_async_with_flags(NetClientState *sender,
                                                  unsigned flags,
@@ -664,6 +684,7 @@ static ssize_t qemu_send_packet_async_with_flags(NetClientState *sender,
     }
 
     /* Let filters handle the packet first */
+	//下面两次filter_receive调用，确定包是否可以发送出去
     ret = filter_receive(sender, NET_FILTER_DIRECTION_TX,
                          sender, flags, buf, size, sent_cb);
     if (ret) {
@@ -676,6 +697,7 @@ static ssize_t qemu_send_packet_async_with_flags(NetClientState *sender,
         return ret;
     }
 
+    //对端的接受队列啊
     queue = sender->peer->incoming_queue;
 
     return qemu_net_queue_send(queue, sender, flags, buf, size, sent_cb);
@@ -692,6 +714,7 @@ static ssize_t qemu_send_packet_async_with_flags(NetClientState *sender,
  *
  * tap_send()
  *  qemu_send_packet_async()
+ *
  */
 ssize_t qemu_send_packet_async(NetClientState *sender,
                                const uint8_t *buf, int size,
@@ -925,7 +948,7 @@ int qemu_find_nic_model(NICInfo *nd, const char * const *models,
 /*
  * main() [vl.c]
  *  net_init_clients() 
- *   net_init_client() 处理-net参数
+ *   net_init_client() 处理-net nic参数
  *    net_client_init()
  *     net_client_init1()
  *      net_init_nic()
@@ -940,6 +963,7 @@ static int net_init_nic(const Netdev *netdev, const char *name,
     assert(netdev->type == NET_CLIENT_DRIVER_NIC);
     nic = &netdev->u.nic;
 
+    //先从nd_table找到一个空闲idx
     idx = nic_get_free_idx();
     if (idx == -1 || nb_nics >= MAX_NICS) {
         error_setg(errp, "too many NICs");
@@ -951,6 +975,7 @@ static int net_init_nic(const Netdev *netdev, const char *name,
     memset(nd, 0, sizeof(*nd));
 
     if (nic->has_netdev) {
+		//找到对应的netdev
         nd->netdev = qemu_find_netdev(nic->netdev);
         if (!nd->netdev) {
             error_setg(errp, "netdev '%s' not found", nic->netdev);
@@ -1118,6 +1143,10 @@ static int net_client_init1(const void *object, bool is_netdev, Error **errp)
             abort();
         }
 
+        /*
+         * -netdev tap时 net_init_tap 
+         * -net nic时 net_init_nic
+         */
         if (!net_client_init_fun[netdev->type]) {
             error_setg(errp, QERR_INVALID_PARAMETER_VALUE, "type",
                        "a net backend type (maybe it is not compiled "
@@ -1205,6 +1234,7 @@ int net_client_init(QemuOpts *opts, bool is_netdev, Error **errp)
         }
     }
 
+    //下面两个方法调用，解析参数，结果放在object中
     if (is_netdev) {//-netdev参数
         visit_type_Netdev(v, NULL, (Netdev **)&object, &err);
     } else {//-net参数

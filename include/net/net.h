@@ -67,6 +67,7 @@ typedef void (SocketReadStateFinalize)(SocketReadState *rs);
 
 /*
  * net_tap_info
+ * net_e1000_info
  */
 typedef struct NetClientInfo {
     NetClientDriver type;
@@ -90,27 +91,37 @@ typedef struct NetClientInfo {
     SetVnetBE *set_vnet_be;
 } NetClientInfo;
 
+/*
+ * 用来链接前后端网卡 ,qemu 中的e1000和host 内核中的tap
+ */
 struct NetClientState {
+    //网卡基本信息
     NetClientInfo *info;
+	//当前网卡是否处于down状态
     int link_down;
+	//链接到net_clients
     QTAILQ_ENTRY(NetClientState) next;
 	//表示对端信息
     NetClientState *peer;
-	//接收队列
+	//网卡的接收队列,NetQueue->packets为这个网卡的数据包
     NetQueue *incoming_queue;
     char *model;
     char *name;
     char info_str[256];
+	//是否禁止收包
     unsigned receive_disabled : 1;
+	//网卡被删除的时候执行
     NetClientDestructor *destructor;
+	//实际的虚拟网卡用NICState表示,queue_index表示在NICState->ncs[]索引
     unsigned int queue_index;
     unsigned rxfilter_notify_enabled:1;
     int vring_enable;
+	//在网卡进行包路由的时候进行过滤，作用类似与防火墙
     QTAILQ_HEAD(NetFilterHead, NetFilterState) filters;
 };
 
 typedef struct NICState {
-    NetClientState *ncs;
+    NetClientState *ncs;//数组
     NICConf *conf;
     void *opaque;
     bool peer_deleted;

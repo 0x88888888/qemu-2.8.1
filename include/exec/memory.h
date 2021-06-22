@@ -223,6 +223,7 @@ struct MemoryRegion {
     Object *owner;
     const MemoryRegionIOMMUOps *iommu_ops;
 
+    //mmio时，mmio_ops作为mmio内存地址的读写函数
     const MemoryRegionOps *ops;
     void *opaque;
 	/*

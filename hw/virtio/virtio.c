@@ -95,6 +95,9 @@ struct VirtQueue
     unsigned int inuse;
 
     uint16_t vector;
+	/*
+	 * qemu收到虚拟机的IO请求时候，会调用handle_output函数
+	 */	
     VirtIOHandleOutput handle_output;
     VirtIOHandleOutput handle_aio_output;
     VirtIODevice *vdev;
@@ -127,7 +130,7 @@ static void vring_desc_read(VirtIODevice *vdev, VRingDesc *desc,
     virtio_tswap32s(vdev, &desc->len);
     virtio_tswap16s(vdev, &desc->flags);
     virtio_tswap16s(vdev, &desc->next);
-}
+} 
 
 static inline uint16_t vring_avail_flags(VirtQueue *vq)
 {
@@ -1314,6 +1317,9 @@ VirtQueue *virtio_add_queue(VirtIODevice *vdev, int queue_size,
     vdev->vq[i].vring.num = queue_size;
     vdev->vq[i].vring.num_default = queue_size;
     vdev->vq[i].vring.align = VIRTIO_PCI_VRING_ALIGN;
+	/*
+	 * qemu收到虚拟机的IO请求时候，会调用handle_output函数
+	 */
     vdev->vq[i].handle_output = handle_output;
     vdev->vq[i].handle_aio_output = NULL;
 
@@ -1926,6 +1932,22 @@ void virtio_instance_init_common(Object *proxy_obj, void *data,
     qdev_alias_all_properties(vdev, proxy_obj);
 }
 
+
+/*
+ * main() [vl.c]
+ *  qemu_opts_foreach()
+ *   device_init_func()
+ *    qdev_device_add()
+ * 	   ....
+ *      device_set_realized()
+ * 	     virtio_pci_dc_realize()
+ * 	      ...
+ *         virtio_balloon_pci_realize()
+ * 	        .....
+ * 	         virtio_device_realize()
+ * 	          virtio_balloon_device_realize()
+ *             virtio_init()
+ */ 
 void virtio_init(VirtIODevice *vdev, const char *name,
                  uint16_t device_id, size_t config_size)
 {
@@ -1944,6 +1966,7 @@ void virtio_init(VirtIODevice *vdev, const char *name,
     atomic_set(&vdev->isr, 0);
     vdev->queue_sel = 0;
     vdev->config_vector = VIRTIO_NO_VECTOR;
+	//分配VirtQueue,其中包含了vring
     vdev->vq = g_malloc0(sizeof(VirtQueue) * VIRTIO_QUEUE_MAX);
     vdev->vm_running = runstate_is_running();
     vdev->broken = false;
@@ -2112,6 +2135,19 @@ void GCC_FMT_ATTR(2, 3) virtio_error(VirtIODevice *vdev, const char *fmt, ...)
     }
 }
 
+/*
+ * main() [vl.c]
+ *  qemu_opts_foreach()
+ *   device_init_func()
+ *    qdev_device_add()
+ *     ....
+ *      device_set_realized()
+ *       virtio_pci_dc_realize()
+ *        ...
+ *         virtio_balloon_pci_realize()
+ *          .....
+ *           virtio_device_realize()
+ */ 
 static void virtio_device_realize(DeviceState *dev, Error **errp)
 {
     VirtIODevice *vdev = VIRTIO_DEVICE(dev);
@@ -2121,7 +2157,7 @@ static void virtio_device_realize(DeviceState *dev, Error **errp)
     /* Devices should either use vmsd or the load/save methods */
     assert(!vdc->vmsd || !vdc->load);
 
-    if (vdc->realize != NULL) {
+    if (vdc->realize != NULL) { //virtio_balloon_device_realize
         vdc->realize(dev, &err);
         if (err != NULL) {
             error_propagate(errp, err);
@@ -2129,6 +2165,7 @@ static void virtio_device_realize(DeviceState *dev, Error **errp)
         }
     }
 
+    //将VirtioDeviceClass挂载到virtio总线上去
     virtio_bus_device_plugged(vdev, &err);
     if (err != NULL) {
         error_propagate(errp, err);

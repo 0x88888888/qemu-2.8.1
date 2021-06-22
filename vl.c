@@ -138,7 +138,8 @@ ram_addr_t ram_size;
 const char *mem_path = NULL;
 int mem_prealloc = 0; /* force preallocation of physical target memory */
 bool enable_mlock = false;
-int nb_nics;
+//当前网卡个数
+int nb_nics; 
 /*
  * 保存虚拟机所有的网卡信息
  */

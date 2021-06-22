@@ -326,6 +326,7 @@ struct CPUState {
     bool unplug;
     bool crash_occurred;
     bool exit_request;
+	//表明设备是否有对vCPU中断请求
     uint32_t interrupt_request;
     int singlestep_enabled;
     int64_t icount_extra;

@@ -238,6 +238,10 @@ static void tap_send_completed(NetClientState *nc, ssize_t len)
     tap_read_poll(s, true);
 }
 
+/*
+ * aio_dispatch()
+ *  tap_send()
+ */
 static void tap_send(void *opaque)
 {
     TAPState *s = opaque;
@@ -258,7 +262,7 @@ static void tap_send(void *opaque)
             size -= s->host_vnet_hdr_len;
         }
 
-        //将读取过来的数据转给vm中的
+        //将读取过来的数据转给e1000->incoming_queue
         size = qemu_send_packet_async(&s->nc, buf, size, tap_send_completed);
         if (size == 0) {
             tap_read_poll(s, false);
@@ -430,7 +434,7 @@ static NetClientInfo net_tap_info = {
  *     net_client_init1()
  *      net_init_tap()
  *       net_init_tap()
- *        net_init_tap_one(name="tap")
+ *        net_init_tap_one(model="tap")
  *         net_tap_fd_init()
  */
 static TAPState *net_tap_fd_init(NetClientState *peer,
@@ -460,6 +464,7 @@ static TAPState *net_tap_fd_init(NetClientState *peer,
     if (tap_probe_vnet_hdr_len(s->fd, s->host_vnet_hdr_len)) {
         tap_fd_set_vnet_hdr_len(s->fd, s->host_vnet_hdr_len);
     }
+	//对TAPState->fd 设置aio 监听
     tap_read_poll(s, true);
     s->vhost_net = NULL;
 
@@ -730,7 +735,7 @@ static int net_tap_init(const NetdevTapOptions *tap, int *vnet_hdr,
  *     net_client_init1()
  *      net_init_tap()
  *       net_init_tap()
- *        net_init_tap_one(name="tap")
+ *        net_init_tap_one(model="tap")
  */
 static void net_init_tap_one(const NetdevTapOptions *tap, NetClientState *peer,
                              const char *model, const char *name,
@@ -739,6 +744,8 @@ static void net_init_tap_one(const NetdevTapOptions *tap, NetClientState *peer,
                              int vnet_hdr, int fd, Error **errp)
 {
     Error *err = NULL;
+
+	//创建TAPState
     TAPState *s = net_tap_fd_init(peer, model, name, fd, vnet_hdr);
     int vhostfd;
 
@@ -833,11 +840,10 @@ static int get_fds(char *str, char *fds[], int max)
 
 /*
  * main() [vl.c]
- *  net_init_clients() 
- *   net_init_client() 处理-net参数
+ *  net_init_clients()
+ *   net_init_netdev() 处理 -netdev 参数
  *    net_client_init()
  *     net_client_init1()
- *      net_init_tap()
  *       net_init_tap()
  */
 int net_init_tap(const Netdev *netdev, const char *name,
@@ -869,6 +875,7 @@ int net_init_tap(const Netdev *netdev, const char *name,
         if (tap->has_ifname || tap->has_script || tap->has_downscript ||
             tap->has_vnet_hdr || tap->has_helper || tap->has_queues ||
             tap->has_fds || tap->has_vhostfds) {
+            
             error_setg(errp, "ifname=, script=, downscript=, vnet_hdr=, "
                        "helper=, queues=, fds=, and vhostfds= "
                        "are invalid with fd=");
@@ -997,6 +1004,10 @@ free_fail:
         }
 
         for (i = 0; i < queues; i++) {
+
+		    /*
+		     * 打开 /dev/net/tap,执行script
+		     */
             fd = net_tap_init(tap, &vnet_hdr, i >= 1 ? "no" : script,
                               ifname, sizeof ifname, queues > 1, errp);
             if (fd == -1) {
@@ -1011,6 +1022,9 @@ free_fail:
                 }
             }
 
+			/*
+			 * 创建TAPState,表示tap，设置tap的send buffer大小
+			 */
             net_init_tap_one(tap, peer, "tap", name, ifname,
                              i >= 1 ? "no" : script,
                              i >= 1 ? "no" : downscript,

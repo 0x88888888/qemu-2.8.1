@@ -897,6 +897,10 @@ static bool device_get_realized(Object *obj, Error **errp)
     return dev->realized;
 }
 
+/*
+ * property_set_bool()
+ *  device_set_realized()
+ */
 static void device_set_realized(Object *obj, bool value, Error **errp)
 {
     DeviceState *dev = DEVICE(obj);
@@ -936,6 +940,8 @@ static void device_set_realized(Object *obj, bool value, Error **errp)
          * 通常是device_realize
          *
          * PCIDeviceClass->realize==pci_qdev_realize
+         * 
+         * virtio_pci_dc_realize
          */
         if (dc->realize) {
             dc->realize(dev, &local_err);
@@ -1043,6 +1049,13 @@ static void device_set_hotplugged(Object *obj, bool value, Error **err)
     dev->hotplugged = value;
 }
 
+/*
+ * qdev_create()
+ *  qdev_try_create()
+ *   object_new()
+ *    ...
+ *     device_initfn()
+ */
 static void device_initfn(Object *obj)
 {
     DeviceState *dev = DEVICE(obj);
@@ -1057,6 +1070,7 @@ static void device_initfn(Object *obj)
     dev->instance_id_alias = -1;
     dev->realized = false;
 
+    //设置,object_property_set_bool 的回调函数
     object_property_add_bool(obj, "realized",
                              device_get_realized, device_set_realized, NULL);
     object_property_add_bool(obj, "hotpluggable",

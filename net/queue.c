@@ -160,7 +160,7 @@ void qemu_net_queue_append_iov(NetQueue *queue,
 *		  qemu_net_queue_send()
 *          qemu_net_queue_deliver()
 */
-static ssize_t qemu_net_queue_deliver(NetQueue *queue,
+static ssize_t qemu_net_queue_deliver(NetQueue *queue, //对端的接收队列
                                       NetClientState *sender,
                                       unsigned flags,
                                       const uint8_t *data,
@@ -174,7 +174,7 @@ static ssize_t qemu_net_queue_deliver(NetQueue *queue,
 
     queue->delivering = 1;
 	//qemu_deliver_packet_iov
-    ret = queue->deliver(sender, flags, &iov, 1, queue->opaque);
+    ret = queue->deliver(sender, flags, &iov, 1, queue->opaque /* 对端接收队列所属的tap设备啊 */);
     queue->delivering = 0;
 
     return ret;
@@ -205,8 +205,13 @@ static ssize_t qemu_net_queue_deliver_iov(NetQueue *queue,
  *	     qemu_send_packet_async()
  *		  qemu_send_packet_async_with_flags()
  *         qemu_net_queue_send()
+ *
+ * tap_send()
+ *  qemu_send_packet_async()
+ *   qemu_send_packet_async_with_flags()
+ *    qemu_net_queue_send()
  */
-ssize_t qemu_net_queue_send(NetQueue *queue,
+ssize_t qemu_net_queue_send(NetQueue *queue,//对端的接收队列
                             NetClientState *sender,
                             unsigned flags,
                             const uint8_t *data,
@@ -215,7 +220,7 @@ ssize_t qemu_net_queue_send(NetQueue *queue,
 {
     ssize_t ret;
 
-    if (queue->delivering || !qemu_can_send_packet(sender)) {//将数据挂到发送队列上去
+    if (queue->delivering || !qemu_can_send_packet(sender)) {//将数据挂到对端的接收队列上去
         qemu_net_queue_append(queue, sender, flags, data, size, sent_cb);
         return 0;
     }

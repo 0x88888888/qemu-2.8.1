@@ -978,8 +978,17 @@ uint16_t pci_requester_id(PCIDevice *dev)
 }
 
 /*
- * pci_qdev_realize()
- *  do_pci_register_device()
+ * main() [vl.c]
+ *  ...
+ *   pc_init1()
+ *    i440fx_init()
+ *     pci_create_simple()
+ *      pci_create_simple_multifunction()
+ *       qdev_init_nofail()
+ *        object_property_set_bool(OBJECT(dev), true, "realized", &err)
+ *         ....
+ *          pci_qdev_realize()
+ *           do_pci_register_device()
  *
  * -1 for devfn means auto assign 
  *
@@ -1118,8 +1127,12 @@ static void pci_qdev_unrealize(DeviceState *dev, Error **errp)
     do_pci_unregister_device(pci_dev);
 }
 
+/*
+ * e1000e_pci_realize()
+ *  pci_register_bar()
+ */
 void pci_register_bar(PCIDevice *pci_dev, int region_num /* base address register 的索引 */,
-                      uint8_t type, MemoryRegion *memory)
+                      uint8_t type, MemoryRegion *memory /*mmio这个region*/)
 {
     PCIIORegion *r;
     uint32_t addr; /* offset in pci config space */
@@ -1385,7 +1398,7 @@ void pci_default_write_config(PCIDevice *d, uint32_t addr, uint32_t val_in, int 
         ranges_overlap(addr, l, PCI_ROM_ADDRESS, 4) ||
         ranges_overlap(addr, l, PCI_ROM_ADDRESS1, 4) ||
         range_covers_byte(addr, l, PCI_COMMAND))
-        pci_update_mappings(d);
+        pci_update_mappings(d);//pci bar 表示的mmio布局，可能会影响guest os在kvm中的内存信息
 
     if (range_covers_byte(addr, l, PCI_COMMAND)) {
         pci_update_irq_disabled(d, was_irq_disabled);
@@ -1861,12 +1874,13 @@ PCIDevice *pci_nic_init_nofail(NICInfo *nd, PCIBus *rootbus,
         exit(0);
     }
 
+	//i为default_module在pci_nic_modules中的index
     i = qemu_find_nic_model(nd, pci_nic_models, default_model);
     if (i < 0) {
         exit(1);
     }
 
-    //返回设备要挂载到的bus，以及设备好devfn
+    //返回设备要挂载到的bus，以及设备号devfn
     bus = pci_get_bus_devfn(&devfn, rootbus, devaddr);
     if (!bus) {
         error_report("Invalid PCI device address %s for device %s",
@@ -1874,12 +1888,14 @@ PCIDevice *pci_nic_init_nofail(NICInfo *nd, PCIBus *rootbus,
         exit(1);
     }
 
+    //创建要挂载在pci总线上的网卡设备,并且挂载到pci总线上去
     pci_dev = pci_create(bus, devfn, pci_nic_names[i]);
     dev = &pci_dev->qdev;
 
 	//根据nd的信息，设置到dev上来
     qdev_set_nic_properties(dev, nd);
 
+    //这里会调用pci_qdev_realize->pci_e1000_realize
     object_property_set_bool(OBJECT(dev), true, "realized", &err);
     if (err) {
         error_report_err(err);
@@ -2017,8 +2033,16 @@ PCIDevice *pci_find_device(PCIBus *bus, int bus_num, uint8_t devfn)
 }
 
 /*
- * device_set_realized()
- *  pci_qdev_realize()
+ * main() [vl.c]
+ *  ...
+ *   pc_init1()
+ *    i440fx_init()
+ *     pci_create_simple()
+ *      pci_create_simple_multifunction()
+ *       qdev_init_nofail()
+ *        object_property_set_bool(OBJECT(dev), true, "realized", &err)
+ *         ....
+ *          pci_qdev_realize()
  */
 static void pci_qdev_realize(DeviceState *qdev, Error **errp)
 {
@@ -2035,14 +2059,15 @@ static void pci_qdev_realize(DeviceState *qdev, Error **errp)
 
     bus = PCI_BUS(qdev_get_parent_bus(qdev));
 
-	//分配pci设备的配置空间等等...
+	//1.分配pci设备的配置空间等等...
     pci_dev = do_pci_register_device(pci_dev, bus,
                                      object_get_typename(OBJECT(qdev)),
                                      pci_dev->devfn, errp);
     if (pci_dev == NULL)
         return;
 
-    if (pc->realize) {//pc_default_realize
+    //2.调用xxx_realize
+    if (pc->realize) {//pc_default_realize,virtio_pci_realize,pci_e1000_realize
         pc->realize(pci_dev, &local_err);
         if (local_err) {
             error_propagate(errp, local_err);
@@ -2051,10 +2076,11 @@ static void pci_qdev_realize(DeviceState *qdev, Error **errp)
         }
     }
 
-    //加载pci设备的ROM 
+    //3.加载pci设备的ROM 
     /* rom loading */
     is_default_rom = false;
     if (pci_dev->romfile == NULL && pc->romfile != NULL) {
+		//使用PCIDeviceClass指定的rom
         pci_dev->romfile = g_strdup(pc->romfile);
         is_default_rom = true;
     }
@@ -2072,8 +2098,17 @@ static void pci_qdev_realize(DeviceState *qdev, Error **errp)
 }
 
 /*
- * pci_qdev_realize()
- *  pci_default_realize()
+ * main() [vl.c]
+ *  ...
+ *   pc_init1()
+ *    i440fx_init()
+ *     pci_create_simple()
+ *      pci_create_simple_multifunction()
+ *       qdev_init_nofail()
+ *        object_property_set_bool(OBJECT(dev), true, "realized", &err)
+ *         ....
+ *          pci_qdev_realize()
+ *           pci_default_realize()
  */
 static void pci_default_realize(PCIDevice *dev, Error **errp)
 {

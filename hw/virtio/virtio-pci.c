@@ -1569,10 +1569,29 @@ static void virtio_pci_pre_plugged(DeviceState *d, Error **errp)
     virtio_add_feature(&vdev->host_features, VIRTIO_F_BAD_FEATURE);
 }
 
-/* This is called by virtio-bus just after the device is plugged. */
+/*
+ * main() [vl.c]
+ *  qemu_opts_foreach()
+ *   device_init_func()
+ *    qdev_device_add()
+ * 	   ....
+ * 	    device_set_realized()
+ *       virtio_pci_dc_realize()
+ * 	      ...
+ * 		   virtio_balloon_pci_realize()
+ * 		    .....
+ * 		     virtio_device_realize()
+ *            virtio_bus_device_plugged
+ *             virtio_pci_device_plugged()
+ *
+ * 将vitio设备挂载到virtio总线上去
+ *
+ * This is called by virtio-bus just after the device is plugged. 
+ */
 static void virtio_pci_device_plugged(DeviceState *d, Error **errp)
 {
     VirtIOPCIProxy *proxy = VIRTIO_PCI(d);
+	//vitio总线
     VirtioBusState *bus = &proxy->bus;
     bool legacy = virtio_pci_legacy(proxy);
     bool modern;
@@ -1620,7 +1639,8 @@ static void virtio_pci_device_plugged(DeviceState *d, Error **errp)
     }
     config[PCI_INTERRUPT_PIN] = 1;
 
-
+    
+    //设置vitio 设备的配置空间
     if (modern) {
         struct virtio_pci_cap cap = {
             .cap_len = sizeof cap,
@@ -1673,6 +1693,7 @@ static void virtio_pci_device_plugged(DeviceState *d, Error **errp)
         pci_set_long(cfg_mask->pci_cfg_data, ~0x0);
     }
 
+    //misx在pci配置空间中的设置
     if (proxy->nvectors) {
         int err = msix_init_exclusive_bar(&proxy->pci_dev, proxy->nvectors,
                                           proxy->msix_bar_idx);
@@ -1723,8 +1744,14 @@ static void virtio_pci_device_unplugged(DeviceState *d)
 }
 
 /*
- * device_set_realized()
- *  virtio_pci_realize()
+ * main()[vl.c]
+ *  qemu_opts_foreach()
+ *   device_init_func()
+ *    qdev_device_add()
+ *     object_property_set_bool(OBJECT(dev), true, "realized", &err)
+ *      ...
+ *       device_set_realized()
+ *        virtio_pci_dc_realize()
  */
 static void virtio_pci_realize(PCIDevice *pci_dev, Error **errp)
 {
@@ -1819,8 +1846,9 @@ static void virtio_pci_realize(PCIDevice *pci_dev, Error **errp)
         pci_dev->cap_present &= ~QEMU_PCI_CAP_EXPRESS;
     }
 
-    virtio_pci_bus_new(&proxy->bus, sizeof(proxy->bus), proxy);
-    if (k->realize) {
+     //在virio pci proxy设备下面创建virtio 总线
+     virtio_pci_bus_new(&proxy->bus, sizeof(proxy->bus), proxy);
+    if (k->realize) { //virtio_balloon_pci_realize
         k->realize(proxy, errp);
     }
 }
@@ -1871,6 +1899,16 @@ static Property virtio_pci_properties[] = {
     DEFINE_PROP_END_OF_LIST(),
 };
 
+/*
+ * main() [vl.c]
+ *  qemu_opts_foreach()
+ *   device_init_func()
+ *    qdev_device_add()
+ *     ....
+ *      device_set_realized()
+ *       virtio_pci_dc_realize()
+ *
+ */ 
 static void virtio_pci_dc_realize(DeviceState *qdev, Error **errp)
 {
     VirtioPCIClass *vpciklass = VIRTIO_PCI_GET_CLASS(qdev);
@@ -1882,6 +1920,7 @@ static void virtio_pci_dc_realize(DeviceState *qdev, Error **errp)
         pci_dev->cap_present |= QEMU_PCI_CAP_EXPRESS;
     }
 
+    //pci_qdev_realize
     vpciklass->parent_dc_realize(qdev, errp);
 }
 
@@ -2145,6 +2184,18 @@ static Property virtio_balloon_pci_properties[] = {
     DEFINE_PROP_END_OF_LIST(),
 };
 
+/*
+ * main() [vl.c]
+ *  qemu_opts_foreach()
+ *   device_init_func()
+ *    qdev_device_add()
+ *     ....
+ *      device_set_realized()
+ *       virtio_pci_dc_realize()
+ *        ...
+ *         virtio_device_realize()
+ *          virtio_balloon_pci_realize()
+ */ 
 static void virtio_balloon_pci_realize(VirtIOPCIProxy *vpci_dev, Error **errp)
 {
     VirtIOBalloonPCI *dev = VIRTIO_BALLOON_PCI(vpci_dev);
@@ -2155,6 +2206,7 @@ static void virtio_balloon_pci_realize(VirtIOPCIProxy *vpci_dev, Error **errp)
         vpci_dev->class_code = PCI_CLASS_OTHERS;
     }
 
+    //将vdev挂载到vpci_dev->bus上去
     qdev_set_parent_bus(vdev, BUS(&vpci_dev->bus));
     object_property_set_bool(OBJECT(vdev), true, "realized", errp);
 }
@@ -2196,6 +2248,9 @@ static void virtio_balloon_pci_instance_init(Object *obj)
                               "guest-stats-polling-interval", &error_abort);
 }
 
+/*
+ * vitrio pci 代理设备
+ */
 static const TypeInfo virtio_balloon_pci_info = {
     .name          = TYPE_VIRTIO_BALLOON_PCI,
     .parent        = TYPE_VIRTIO_PCI,
@@ -2454,6 +2509,7 @@ static void virtio_tablet_initfn(Object *obj)
                                 TYPE_VIRTIO_TABLET);
 }
 
+
 static const TypeInfo virtio_input_pci_info = {
     .name          = TYPE_VIRTIO_INPUT_PCI,
     .parent        = TYPE_VIRTIO_PCI,
@@ -2509,8 +2565,17 @@ static const TypeInfo virtio_host_pci_info = {
 };
 #endif
 
-/* virtio-pci-bus */
-
+/*
+ * main()[vl.c]
+ *  qemu_opts_foreach()
+ *   device_init_func()
+ *    qdev_device_add()
+ *     object_property_set_bool(OBJECT(dev), true, "realized", &err)
+ *      ...
+ *       device_set_realized()
+ *        virtio_pci_dc_realize()
+ *         virtio-pci-bus()
+ */
 static void virtio_pci_bus_new(VirtioBusState *bus, size_t bus_size,
                                VirtIOPCIProxy *dev)
 {
@@ -2521,6 +2586,10 @@ static void virtio_pci_bus_new(VirtioBusState *bus, size_t bus_size,
                         virtio_bus_name);
 }
 
+/*
+ * type_initialize()
+ *  virtio_pci_bus_class_init()
+ */
 static void virtio_pci_bus_class_init(ObjectClass *klass, void *data)
 {
     BusClass *bus_class = BUS_CLASS(klass);
@@ -2543,6 +2612,8 @@ static void virtio_pci_bus_class_init(ObjectClass *klass, void *data)
     k->query_nvectors = virtio_pci_query_nvectors;
     k->ioeventfd_enabled = virtio_pci_ioeventfd_enabled;
     k->ioeventfd_assign = virtio_pci_ioeventfd_assign;
+
+	
 }
 
 static const TypeInfo virtio_pci_bus_info = {

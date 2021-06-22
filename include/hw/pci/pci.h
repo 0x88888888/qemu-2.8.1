@@ -203,6 +203,10 @@ typedef struct PCIINTxRoute {
 typedef struct PCIDeviceClass {
     DeviceClass parent_class;
 
+    /* 
+     * pci_device_class_init中定义为pci_default_realize
+     * 
+     */
     void (*realize)(PCIDevice *dev, Error **errp);
     int (*init)(PCIDevice *dev);/* TODO convert to realize() and remove */
     PCIUnregisterFunc *exit;
@@ -220,6 +224,8 @@ typedef struct PCIDeviceClass {
      * pci-to-pci bridge or normal device.
      * This doesn't mean pci host switch.
      * When card bus bridge is supported, this would be enhanced.
+     *
+     * 是否是pci-to-pci桥
      */
     int is_bridge;
 

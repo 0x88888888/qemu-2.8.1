@@ -1427,7 +1427,9 @@ MemTxResult memory_region_dispatch_write(MemoryRegion *mr,
  *   io_mem_init()
  *    memory_region_init_io()
  *
- * 创建一个MMIO 的MemoryRegion
+ * 创建一个MMIO 的MemoryRegion,所以这个函数中没有设置mr->ram哦
+ *
+ * MMIO的MemoryRegion 在kvm_set_phys_mem中不会被提交到KVM
  */
 void memory_region_init_io(MemoryRegion *mr,
                            Object *owner,//mr的父MemoryRegion

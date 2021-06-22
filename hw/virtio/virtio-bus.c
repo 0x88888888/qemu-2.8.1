@@ -38,7 +38,24 @@ do { printf("virtio_bus: " fmt , ## __VA_ARGS__); } while (0)
 #define DPRINTF(fmt, ...) do { } while (0)
 #endif
 
-/* A VirtIODevice is being plugged */
+/*
+ * main() [vl.c]
+ *  qemu_opts_foreach()
+ *   device_init_func()
+ *    qdev_device_add()
+ *     ....
+ *      device_set_realized()
+ *       virtio_pci_dc_realize()
+ *        ...
+ *         virtio_balloon_pci_realize()
+ *          .....
+ *           virtio_device_realize()
+ *            virtio_bus_device_plugged() 
+ *
+ * A VirtIODevice is being plugged 
+ *
+ * 将virtio设备挂载virtio总线上去
+ */
 void virtio_bus_device_plugged(VirtIODevice *vdev, Error **errp)
 {
     DeviceState *qdev = DEVICE(vdev);
@@ -58,7 +75,7 @@ void virtio_bus_device_plugged(VirtIODevice *vdev, Error **errp)
     vdev->host_features = vdc->get_features(vdev, vdev->host_features,
                                             errp);
 
-    if (klass->device_plugged != NULL) {
+    if (klass->device_plugged != NULL) { //virtio_pci_device_plugged
         klass->device_plugged(qbus->parent, errp);
     }
 }

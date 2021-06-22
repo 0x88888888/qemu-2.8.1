@@ -667,6 +667,10 @@ Object *object_new_with_type(Type type)
  *   device_init_func()
  *    qdev_device_add()
  *     object_new()
+ *
+ * qdev_create()
+ *  qdev_try_create()
+ *   object_new()
  */
 Object *object_new(const char *typename)
 {
@@ -1297,7 +1301,7 @@ void object_property_set(Object *obj, Visitor *v, const char *name,
 
     if (!prop->set) {
         error_setg(errp, QERR_PERMISSION_DENIED);
-    } else {
+    } else { //property_set_bool
         prop->set(obj, v, name, prop->opaque, errp);
     }
 }
@@ -2064,6 +2068,7 @@ static void property_set_bool(Object *obj, Visitor *v, const char *name,
         return;
     }
 
+    //device_set_realized
     prop->set(obj, value, errp);
 }
 

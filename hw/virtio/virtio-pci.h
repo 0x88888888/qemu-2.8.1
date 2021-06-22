@@ -134,6 +134,9 @@ typedef struct VirtIOPCIQueue {
   uint32_t used[2];
 } VirtIOPCIQueue;
 
+/*
+ * 所有Virtio PCI 代理设备的父类
+ */
 struct VirtIOPCIProxy {
 	//包含虚拟PCI设备信息
     PCIDevice pci_dev;
@@ -167,6 +170,9 @@ struct VirtIOPCIProxy {
 
     VirtIOIRQFD *vector_irqfd;
     int nvqs_with_notifiers;
+    /*
+     *  这个virtio pci设备创建出来的virtio总线
+     */
     VirtioBusState bus;
 };
 
@@ -236,8 +242,10 @@ struct VirtIOBlkPCI {
 #define VIRTIO_BALLOON_PCI(obj) \
         OBJECT_CHECK(VirtIOBalloonPCI, (obj), TYPE_VIRTIO_BALLOON_PCI)
 
+//Virtio pci代理设备
 struct VirtIOBalloonPCI {
     VirtIOPCIProxy parent_obj;
+	//Virtio 设备
     VirtIOBalloon vdev;
 };
 
@@ -248,6 +256,7 @@ struct VirtIOBalloonPCI {
 #define VIRTIO_SERIAL_PCI(obj) \
         OBJECT_CHECK(VirtIOSerialPCI, (obj), TYPE_VIRTIO_SERIAL_PCI)
 
+//Virtio pci代理设备
 struct VirtIOSerialPCI {
     VirtIOPCIProxy parent_obj;
     VirtIOSerial vdev;
@@ -260,6 +269,7 @@ struct VirtIOSerialPCI {
 #define VIRTIO_NET_PCI(obj) \
         OBJECT_CHECK(VirtIONetPCI, (obj), TYPE_VIRTIO_NET_PCI)
 
+//Virtio pci代理设备
 struct VirtIONetPCI {
     VirtIOPCIProxy parent_obj;
     VirtIONet vdev;

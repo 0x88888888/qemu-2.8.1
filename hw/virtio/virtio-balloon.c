@@ -421,12 +421,29 @@ static const VMStateDescription vmstate_virtio_balloon_device = {
     },
 };
 
+/*
+ * main() [vl.c]
+ *  qemu_opts_foreach()
+ *   device_init_func()
+ *    qdev_device_add()
+ *     ....
+ *      device_set_realized()
+ *       virtio_pci_dc_realize()
+ *        ...
+ *         virtio_balloon_pci_realize()
+ *          .....
+ *           virtio_device_realize()
+ *            virtio_balloon_device_realize()
+ */ 
 static void virtio_balloon_device_realize(DeviceState *dev, Error **errp)
 {
     VirtIODevice *vdev = VIRTIO_DEVICE(dev);
     VirtIOBalloon *s = VIRTIO_BALLOON(dev);
     int ret;
 
+    /*
+     * 初始化VirtIODevice这个部分
+     */
     virtio_init(vdev, "virtio-balloon", VIRTIO_ID_BALLOON,
                 sizeof(struct virtio_balloon_config));
 
@@ -439,6 +456,9 @@ static void virtio_balloon_device_realize(DeviceState *dev, Error **errp)
         return;
     }
 
+    /*
+     * 创建三个virtqueue
+     */
     s->ivq = virtio_add_queue(vdev, 128, virtio_balloon_handle_output);
     s->dvq = virtio_add_queue(vdev, 128, virtio_balloon_handle_output);
     s->svq = virtio_add_queue(vdev, 128, virtio_balloon_receive_stats);

@@ -49,6 +49,9 @@ typedef struct NetFilterClass {
 } NetFilterClass;
 
 
+/*
+ * 看NetClientState->filters
+ */
 struct NetFilterState {
     /* private */
     Object parent;

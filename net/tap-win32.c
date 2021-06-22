@@ -788,6 +788,7 @@ static int tap_win32_init(NetClientState *peer, const char *model,
     return 0;
 }
 
+
 int net_init_tap(const Netdev *netdev, const char *name,
                  NetClientState *peer, Error **errp)
 {
