@@ -1076,6 +1076,18 @@ static void vhost_virtqueue_cleanup(struct vhost_virtqueue *vq)
     event_notifier_cleanup(&vq->masked_notifier);
 }
 
+/*
+ * main() [vl.c]
+ *	net_init_clients() 
+ *	 net_init_client() 处理-net参数
+ *	  net_client_init()
+ *	   net_client_init1()
+ *		net_init_tap()
+ *		 net_init_tap()
+ *		  net_init_tap_one(model="tap")
+ *         vhost_net_init()
+ *          vhost_dev_init()
+ */
 int vhost_dev_init(struct vhost_dev *hdev, void *opaque,
                    VhostBackendType backend_type, uint32_t busyloop_timeout)
 {

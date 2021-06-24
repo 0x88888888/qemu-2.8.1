@@ -204,6 +204,12 @@ static void balloon_stats_set_poll_interval(Object *obj, Visitor *v,
     balloon_stats_change_timer(s, 0);
 }
 
+/*
+ * virtio_pci_config_write()
+ *	virtio_ioport_write()
+ *	 virtio_queue_notify()
+ *    virtio_balloon_handle_output()
+ */
 static void virtio_balloon_handle_output(VirtIODevice *vdev, VirtQueue *vq)
 {
     VirtIOBalloon *s = VIRTIO_BALLOON(vdev);
@@ -213,11 +219,13 @@ static void virtio_balloon_handle_output(VirtIODevice *vdev, VirtQueue *vq)
     for (;;) {
         size_t offset = 0;
         uint32_t pfn;
+	    //从avail ring中取出数据
         elem = virtqueue_pop(vq, sizeof(VirtQueueElement));
         if (!elem) {
             return;
         }
 
+        //while循环用于处理 vring_desc中的数据
         while (iov_to_buf(elem->out_sg, elem->out_num, offset, &pfn, 4) == 4) {
             ram_addr_t pa;
             ram_addr_t addr;
@@ -246,7 +254,9 @@ static void virtio_balloon_handle_output(VirtIODevice *vdev, VirtQueue *vq)
             memory_region_unref(section.mr);
         }
 
+        //将vring desc放入到used ring[]中去
         virtqueue_push(vq, elem, offset);
+		//通知guest os
         virtio_notify(vdev, vq);
         g_free(elem);
     }

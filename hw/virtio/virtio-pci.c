@@ -65,10 +65,24 @@ static inline VirtIOPCIProxy *to_virtio_pci_proxy_fast(DeviceState *d)
     return container_of(d, VirtIOPCIProxy, pci_dev.qdev);
 }
 
+/*
+ * virtio_pci_config_write()
+ *	virtio_ioport_write()
+ *	 virtio_queue_notify()
+ *    virtio_balloon_handle_output()
+ *     virtio_notify()
+ *      virtio_notify_vector()
+ *       virtio_pci_notify()
+ * 更改了vring的信息,通知guest os的vitio 驱动
+ */
 static void virtio_pci_notify(DeviceState *d, uint16_t vector)
 {
     VirtIOPCIProxy *proxy = to_virtio_pci_proxy_fast(d);
 
+    /*
+     * 下面通过系统调用，先到kvm层，然后设置vmcs相应的中断信息，guest os会就处理了
+     *  guest os中处理这个notify 中断的函数为 vp_interrupt
+     */
     if (msix_enabled(&proxy->pci_dev))
         msix_notify(&proxy->pci_dev, vector);
     else {

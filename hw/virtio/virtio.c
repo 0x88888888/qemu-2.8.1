@@ -73,36 +73,69 @@ struct VirtQueue
 {
     VRing vring;
 
-    /* Next head to pop */
+    /* Next head to pop 
+     *
+     * 下一次要从avail ring[]中取数据的index
+	 */
     uint16_t last_avail_idx;
 
-    /* Last avail_idx read from VQ. */
+    /* Last avail_idx read from VQ.
+     *
+     * 最近一次从avail ring中取数据的index
+     */
     uint16_t shadow_avail_idx;
 
+    /*
+     * 本次要使用的use ring[]的index
+     */
     uint16_t used_idx;
 
-    /* Last used index value we have signalled on */
+    /*
+     * 上一次通知驱动侧(guest os)时的used ring[] index
+     * Last used index value we have signalled on 
+	 */
     uint16_t signalled_used;
 
-    /* Last used index value we have signalled on */
+    /* Last used index value we have signalled on 
+     *
+     * signalled_used是否有效
+	 */
     bool signalled_used_valid;
 
-    /* Notification enabled? */
+    /* Notification enabled? 
+     *
+     * 是否需要通知驱动端(guest os)
+     */
     bool notification;
 
+    //选择的队列索引
     uint16_t queue_index;
 
+    /*
+     * 队列中正在处理的请求个数
+     */
     unsigned int inuse;
 
+    /*
+     * 使用MSI-X通知时，该队列使用的vector
+     */
     uint16_t vector;
 	/*
+	 * guest os发送mmio请求给notify MemoryRegion,QEMU这边会掉用对应的函数virtio_queue_notify
+	 * virtio_queue_notify调用handle_output或者handle_aio_output
+	 *
 	 * qemu收到虚拟机的IO请求时候，会调用handle_output函数
 	 */	
     VirtIOHandleOutput handle_output;
+	//与handle_output类似
     VirtIOHandleOutput handle_aio_output;
+	//
     VirtIODevice *vdev;
+	
     EventNotifier guest_notifier;
     EventNotifier host_notifier;
+
+	//将一个设备的VirtQueue链接起来
     QLIST_ENTRY(VirtQueue) node;
 };
 
@@ -159,6 +192,15 @@ static inline uint16_t vring_get_used_event(VirtQueue *vq)
     return vring_avail_ring(vq, vq->vring.num);
 }
 
+/*
+ * virtio_pci_config_write()
+ *	virtio_ioport_write()
+ *	 virtio_queue_notify()
+ *    virtio_balloon_handle_output()
+ *     virtqueue_push()
+ *      virtqueue_fill()
+ *       vring_used_write()
+ */
 static inline void vring_used_write(VirtQueue *vq, VRingUsedElem *uelem,
                                     int i)
 {
@@ -319,6 +361,14 @@ bool virtqueue_rewind(VirtQueue *vq, unsigned int num)
     return true;
 }
 
+/*
+ * virtio_pci_config_write()
+ *	virtio_ioport_write()
+ *	 virtio_queue_notify()
+ *    virtio_balloon_handle_output()
+ *     virtqueue_push()
+ *      virtqueue_fill()
+ */
 void virtqueue_fill(VirtQueue *vq, const VirtQueueElement *elem,
                     unsigned int len, unsigned int idx)
 {
@@ -359,11 +409,18 @@ void virtqueue_flush(VirtQueue *vq, unsigned int count)
         vq->signalled_used_valid = false;
 }
 
+/*
+ * virtio_pci_config_write()
+ *	virtio_ioport_write()
+ *	 virtio_queue_notify()
+ *    virtio_balloon_handle_output()
+ *     virtqueue_push()
+ */
 void virtqueue_push(VirtQueue *vq, const VirtQueueElement *elem,
                     unsigned int len)
 {
-    virtqueue_fill(vq, elem, len, 0);
-    virtqueue_flush(vq, 1);
+    virtqueue_fill(vq, elem, len, 0);//构造VRingUsedElem，写入到used ring[]中去
+    virtqueue_flush(vq, 1);//更新used ring  的idx
 }
 
 static int virtqueue_num_heads(VirtQueue *vq, unsigned int idx)
@@ -642,6 +699,15 @@ static void *virtqueue_alloc_element(size_t sz, unsigned out_num, unsigned in_nu
     return elem;
 }
 
+/*
+ * virtio_pci_config_write()
+ *	virtio_ioport_write()
+ *	 virtio_queue_notify()
+ *    virtio_balloon_handle_output()
+ *     virtqueue_pop()
+ *
+ * 从avail ring[]中取出数据
+ */
 void *virtqueue_pop(VirtQueue *vq, size_t sz)
 {
     unsigned int i, head, max;
@@ -654,6 +720,7 @@ void *virtqueue_pop(VirtQueue *vq, size_t sz)
     VRingDesc desc;
     int rc;
 
+    //不能是broken，并且要有数据，才能pop
     if (unlikely(vdev->broken)) {
         return NULL;
     }
@@ -674,15 +741,20 @@ void *virtqueue_pop(VirtQueue *vq, size_t sz)
         return NULL;
     }
 
+    /*
+     * head= vq->vring.avial[last_avail_idx]
+	 */
     if (!virtqueue_get_head(vq, vq->last_avail_idx++, &head)) {
         return NULL;
     }
 
+    //设置used ring的avail event index
     if (virtio_vdev_has_feature(vdev, VIRTIO_RING_F_EVENT_IDX)) {
         vring_set_avail_event(vq, vq->last_avail_idx);
     }
 
     i = head;
+	//读取desc中的数据到desc_pa
     vring_desc_read(vdev, &desc, desc_pa, i);
     if (desc.flags & VRING_DESC_F_INDIRECT) {
         if (desc.len % sizeof(VRingDesc)) {
@@ -702,6 +774,7 @@ void *virtqueue_pop(VirtQueue *vq, size_t sz)
         bool map_ok;
 
         if (desc.flags & VRING_DESC_F_WRITE) {
+			//把guest os在的物理地址map成qemu进程中的虚拟地址
             map_ok = virtqueue_map_desc(vdev, &in_num, addr + out_num,
                                         iov + out_num,
                                         VIRTQUEUE_MAX_SIZE - out_num, true,
@@ -715,6 +788,7 @@ void *virtqueue_pop(VirtQueue *vq, size_t sz)
                                         VIRTQUEUE_MAX_SIZE, false,
                                         desc.addr, desc.len);
         }
+		
         if (!map_ok) {
             goto err_undo_map;
         }
@@ -725,6 +799,7 @@ void *virtqueue_pop(VirtQueue *vq, size_t sz)
             goto err_undo_map;
         }
 
+        //读取下一个vring_desc
         rc = virtqueue_read_next_desc(vdev, &desc, desc_pa, max, &i);
     } while (rc == VIRTQUEUE_READ_DESC_MORE);
 
@@ -733,6 +808,7 @@ void *virtqueue_pop(VirtQueue *vq, size_t sz)
     }
 
     /* Now copy what we have collected and mapped */
+	//分配VirtQueueElement，将vring中的数据组合起来
     elem = virtqueue_alloc_element(sz, out_num, in_num);
     elem->index = head;
     for (i = 0; i < out_num; i++) {
@@ -847,6 +923,17 @@ void qemu_put_virtqueue_element(QEMUFile *f, VirtQueueElement *elem)
     qemu_put_buffer(f, (uint8_t *)&data, sizeof(VirtQueueElementOld));
 }
 
+
+/*
+ * virtio_pci_config_write()
+ *	virtio_ioport_write()
+ *	 virtio_queue_notify()
+ *    virtio_balloon_handle_output()
+ *     virtio_notify()
+ *      virtio_notify_vector()
+ *
+ * 更改了vring的信息,通知guest os的vitio 驱动
+ */
 /* virtio device */
 static void virtio_notify_vector(VirtIODevice *vdev, uint16_t vector)
 {
@@ -857,7 +944,7 @@ static void virtio_notify_vector(VirtIODevice *vdev, uint16_t vector)
         return;
     }
 
-    if (k->notify) {
+    if (k->notify) {//在virtio_pci_bus_class_init中被设置成 virtio_pci_notify
         k->notify(qbus->parent, vector);
     }
 }
@@ -1271,9 +1358,10 @@ void virtio_queue_notify(VirtIODevice *vdev, int n)
     }
 
     trace_virtio_queue_notify(vdev, vq - vdev->vq, vq);
+	
     if (vq->handle_aio_output) {
         event_notifier_set(&vq->host_notifier);
-    } else if (vq->handle_output) {
+    } else if (vq->handle_output) { //virtio_balloon_handle_output
         vq->handle_output(vdev, vq);
     }
 }
@@ -1398,6 +1486,15 @@ void virtio_notify_irqfd(VirtIODevice *vdev, VirtQueue *vq)
     event_notifier_set(&vq->guest_notifier);
 }
 
+/*
+ * virtio_pci_config_write()
+ *	virtio_ioport_write()
+ *	 virtio_queue_notify()
+ *    virtio_balloon_handle_output()
+ *     virtio_notify()
+ *
+ * 更改了vring的信息,通知guest os的vitio 驱动
+ */
 void virtio_notify(VirtIODevice *vdev, VirtQueue *vq)
 {
     if (!virtio_should_notify(vdev, vq)) {
@@ -1405,7 +1502,7 @@ void virtio_notify(VirtIODevice *vdev, VirtQueue *vq)
     }
 
     trace_virtio_notify(vdev, vq);
-    virtio_set_isr(vq->vdev, 0x1);
+    virtio_set_isr(vq->vdev, 0x1);//vdev->isr=0x1
     virtio_notify_vector(vdev, vq->vector);
 }
 

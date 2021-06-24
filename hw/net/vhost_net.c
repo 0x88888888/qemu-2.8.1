@@ -136,6 +136,17 @@ static int vhost_net_get_fd(NetClientState *backend)
     }
 }
 
+/*
+ * main() [vl.c]
+ *	net_init_clients() 
+ *	 net_init_client() 处理-net参数
+ *	  net_client_init()
+ *	   net_client_init1()
+ *		net_init_tap()
+ *		 net_init_tap()
+ *		  net_init_tap_one(model="tap")
+ *         vhost_net_init()
+ */
 struct vhost_net *vhost_net_init(VhostNetOptions *options)
 {
     int r;
