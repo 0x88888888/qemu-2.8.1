@@ -20,6 +20,9 @@ struct vhost_virtqueue {
     unsigned avail_size;
     unsigned long long used_phys;
     unsigned used_size;
+	/*
+	 * eventfd,在vhost_virtqueue_init中初始化
+	 */
     EventNotifier masked_notifier;
 };
 
@@ -38,6 +41,9 @@ struct vhost_log {
 
 struct vhost_memory;
 struct vhost_dev {
+	/*
+	 * 添加到address_space_memory->listeners
+	 */
     MemoryListener memory_listener;
     struct vhost_memory *mem;
     int n_mem_sections;
@@ -58,6 +64,10 @@ struct vhost_dev {
     bool memory_changed;
     hwaddr mem_changed_start_addr;
     hwaddr mem_changed_end_addr;
+	/*
+	 * 通常是kernel_ops
+	 * 也有 user_ops
+	 */
     const VhostOps *vhost_ops;
     void *opaque;
     struct vhost_log *log;

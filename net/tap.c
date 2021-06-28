@@ -56,6 +56,7 @@ typedef struct TAPState {
     bool using_vnet_hdr;
     bool has_ufo;
     bool enabled;
+	//与内核的vhost-net联系
     VHostNetState *vhost_net;
     unsigned host_vnet_hdr_len;
     Notifier exit;
@@ -736,6 +737,9 @@ static int net_tap_init(const NetdevTapOptions *tap, int *vnet_hdr,
  *      net_init_tap()
  *       net_init_tap()
  *        net_init_tap_one(model="tap")
+ *
+ * NetdevTapOptions在编译时产生
+ * https://android.googlesource.com/platform/external/qemu/+/master/qapi-auto-generated/qapi-types.h
  */
 static void net_init_tap_one(const NetdevTapOptions *tap, NetClientState *peer,
                              const char *model, const char *name,
@@ -773,11 +777,12 @@ static void net_init_tap_one(const NetdevTapOptions *tap, NetClientState *peer,
         }
     }
 
-    //要在内核使用vhost,代替qemu用户空间处理vring数据
+    //要在使用vhost accelerator,代替qemu用户空间处理vring数据
     if (tap->has_vhost ? tap->vhost :
         vhostfdname || (tap->has_vhostforce && tap->vhostforce)) {
         VhostNetOptions options;
 
+        //virtio 的后端在内核了，不在qemu层面了
         options.backend_type = VHOST_BACKEND_TYPE_KERNEL;
         options.net_backend = &s->nc;
         if (tap->has_poll_us) {
@@ -792,7 +797,7 @@ static void net_init_tap_one(const NetdevTapOptions *tap, NetClientState *peer,
                 error_propagate(errp, err);
                 return;
             }
-        } else {
+        } else {//走这里,这个设备文件就是内核代码的vhost_net_misc对象
             vhostfd = open("/dev/vhost-net", O_RDWR);
             if (vhostfd < 0) {
                 error_setg_errno(errp, errno,
@@ -800,8 +805,10 @@ static void net_init_tap_one(const NetdevTapOptions *tap, NetClientState *peer,
                 return;
             }
         }
+		//保存/dev/vhost-net
         options.opaque = (void *)(uintptr_t)vhostfd;
 
+        //创建vhost_net,初始化
         s->vhost_net = vhost_net_init(&options);
         if (!s->vhost_net) {
             error_setg(errp,
@@ -850,7 +857,8 @@ static int get_fds(char *str, char *fds[], int max)
 int net_init_tap(const Netdev *netdev, const char *name,
                  NetClientState *peer, Error **errp)
 {
-    const NetdevTapOptions *tap;
+   
+    const NetdevTapOptions *tap;//这个类型在编译时产生
     int fd, vnet_hdr = 0, i = 0, queues;
     /* for the no-fd, no-helper case */
     const char *script = NULL; /* suppress wrong "uninit'd use" gcc warning */
@@ -862,6 +870,7 @@ int net_init_tap(const Netdev *netdev, const char *name,
     assert(netdev->type == NET_CLIENT_DRIVER_TAP);
 	//得到NetdevTapOptions对象先,下面根据指定tap设备的方式初始化tap
     tap = &netdev->u.tap;
+	//tap设备的队列
     queues = tap->has_queues ? tap->queues : 1;
     vhostfdname = tap->has_vhostfd ? tap->vhostfd : NULL;
 
@@ -872,7 +881,7 @@ int net_init_tap(const Netdev *netdev, const char *name,
         return -1;
     }
 
-    if (tap->has_fd) { //通过fd的方式指定tap
+    if (tap->has_fd) { //通过fd的方式指定tap,只有一个fd
         if (tap->has_ifname || tap->has_script || tap->has_downscript ||
             tap->has_vnet_hdr || tap->has_helper || tap->has_queues ||
             tap->has_fds || tap->has_vhostfds) {
@@ -900,7 +909,7 @@ int net_init_tap(const Netdev *netdev, const char *name,
             error_propagate(errp, err);
             return -1;
         }
-    } else if (tap->has_fds) {
+    } else if (tap->has_fds) {//多个fd
         char **fds = g_new0(char *, MAX_TAP_QUEUES);
         char **vhost_fds = g_new0(char *, MAX_TAP_QUEUES);
         int nfds, nvhosts;
@@ -997,8 +1006,8 @@ free_fail:
         script = tap->has_script ? tap->script : DEFAULT_NETWORK_SCRIPT;
         downscript = tap->has_downscript ? tap->downscript :
             DEFAULT_NETWORK_DOWN_SCRIPT;
-
-        if (tap->has_ifname) {
+ 
+        if (tap->has_ifname) { //设备名称
             pstrcpy(ifname, sizeof ifname, tap->ifname);
         } else {
             ifname[0] = '\0';

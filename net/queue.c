@@ -262,6 +262,10 @@ ssize_t qemu_net_queue_send_iov(NetQueue *queue,
     return ret;
 }
 
+/*
+ * 
+ * 丢弃数据包
+ */
 void qemu_net_queue_purge(NetQueue *queue, NetClientState *from)
 {
     NetPacket *packet, *next;

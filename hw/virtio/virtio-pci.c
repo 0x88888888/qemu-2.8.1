@@ -750,6 +750,16 @@ static void kvm_virtio_pci_irqfd_release(VirtIOPCIProxy *proxy,
     assert(ret == 0);
 }
 
+/*
+ * virtio_net_set_link_status()
+ *  virtio_net_set_status()
+ *   virtio_net_vhost_status()
+ *    vhost_net_start()
+ *     virtio_pci_set_guest_notifiers()
+ *      kvm_virtio_pci_vector_use()
+ *
+ * 将guest_notify与virtio设备中断关联起来，在内核中构成一个irqfd
+ */
 static int kvm_virtio_pci_vector_use(VirtIOPCIProxy *proxy, int nvqs)
 {
     PCIDevice *dev = &proxy->pci_dev;
@@ -1005,6 +1015,15 @@ static bool virtio_pci_query_guest_notifiers(DeviceState *d)
     return msix_enabled(&proxy->pci_dev);
 }
 
+/*
+ * virtio_net_set_link_status()
+ *  virtio_net_set_status()
+ *   virtio_net_vhost_status()
+ *    vhost_net_start()
+ *     virtio_pci_set_guest_notifiers()
+ *
+ * 设置从host到vm通知的eventfd
+ */
 static int virtio_pci_set_guest_notifiers(DeviceState *d, int nvqs, bool assign)
 {
     VirtIOPCIProxy *proxy = to_virtio_pci_proxy(d);
@@ -1046,15 +1065,22 @@ static int virtio_pci_set_guest_notifiers(DeviceState *d, int nvqs, bool assign)
 
     /* Must set vector notifier after guest notifier has been assigned */
     if ((with_irqfd || k->guest_notifier_mask) && assign) {
-        if (with_irqfd) {
+		
+        if (with_irqfd) {//以irqfd的方式
             proxy->vector_irqfd =
                 g_malloc0(sizeof(*proxy->vector_irqfd) *
                           msix_nr_vectors_allocated(&proxy->pci_dev));
+
+			//将guest_notify与virtio设备中断关联起来，在内核中构成一个irqfd
             r = kvm_virtio_pci_vector_use(proxy, nvqs);
             if (r < 0) {
                 goto assign_error;
             }
         }
+		/*
+		 * 将guest_notifier对应的fd通过ioctl(VHOST_SET_VRING_CALL)通知到vhost-net模块，
+		 * 这样就创建了host到vm的通知机制,vhost-net模块可以直接设置该eventfd,从而让VM收到中断
+		 */
         r = msix_set_vector_notifiers(&proxy->pci_dev,
                                       virtio_pci_vector_unmask,
                                       virtio_pci_vector_mask,

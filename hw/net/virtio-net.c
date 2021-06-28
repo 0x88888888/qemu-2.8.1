@@ -117,6 +117,11 @@ static void virtio_net_announce_timer(void *opaque)
     virtio_notify_config(vdev);
 }
 
+/*
+ * virtio_net_set_link_status()
+ *  virtio_net_set_status()
+ *   virtio_net_vhost_status()
+ */
 static void virtio_net_vhost_status(VirtIONet *n, uint8_t status)
 {
     VirtIODevice *vdev = VIRTIO_DEVICE(n);
@@ -131,6 +136,7 @@ static void virtio_net_vhost_status(VirtIONet *n, uint8_t status)
         !!n->vhost_started) {
         return;
     }
+		
     if (!n->vhost_started) {
         int r, i;
 
@@ -153,6 +159,7 @@ static void virtio_net_vhost_status(VirtIONet *n, uint8_t status)
         }
 
         n->vhost_started = 1;
+		//启动，让vm的收发包通过VM来完成
         r = vhost_net_start(vdev, n->nic->ncs, queues);
         if (r < 0) {
             error_report("unable to start vhost net: %d: "
@@ -218,6 +225,10 @@ static void virtio_net_vnet_endian_status(VirtIONet *n, uint8_t status)
     }
 }
 
+/*
+ * virtio_net_set_link_status()
+ *  virtio_net_set_status()
+ */
 static void virtio_net_set_status(struct VirtIODevice *vdev, uint8_t status)
 {
     VirtIONet *n = VIRTIO_NET(vdev);
@@ -226,6 +237,7 @@ static void virtio_net_set_status(struct VirtIODevice *vdev, uint8_t status)
     uint8_t queue_status;
 
     virtio_net_vnet_endian_status(n, status);
+	
     virtio_net_vhost_status(n, status);
 
     for (i = 0; i < n->max_queues; i++) {

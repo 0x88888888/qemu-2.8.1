@@ -38,8 +38,10 @@
 #include "hw/virtio/virtio-bus.h"
 
 struct vhost_net {
+    //表示一个vhost的设备对象
     struct vhost_dev dev;
     struct vhost_virtqueue vqs[2];
+	//tap设备对应的fd
     int backend;
     NetClientState *nc;
 };
@@ -109,9 +111,22 @@ uint64_t vhost_net_get_features(struct vhost_net *net, uint64_t features)
             features);
 }
 
+/*
+ * main() [vl.c]
+ *	net_init_clients() 
+ *	 net_init_client() 处理-net参数
+ *	  net_client_init()
+ *	   net_client_init1()
+ *		net_init_tap()
+ *		 net_init_tap()
+ *		  net_init_tap_one(model="tap")
+ *         vhost_net_init()
+ *          vhost_net_ack_features()
+ */
 void vhost_net_ack_features(struct vhost_net *net, uint64_t features)
 {
     net->dev.acked_features = net->dev.backend_features;
+	//设置net->dev->acked_features
     vhost_ack_features(&net->dev, vhost_net_get_feature_bits(net), features);
 }
 
@@ -150,7 +165,9 @@ static int vhost_net_get_fd(NetClientState *backend)
 struct vhost_net *vhost_net_init(VhostNetOptions *options)
 {
     int r;
+	//true
     bool backend_kernel = options->backend_type == VHOST_BACKEND_TYPE_KERNEL;
+	//
     struct vhost_net *net = g_new0(struct vhost_net, 1);
     uint64_t features = 0;
 
@@ -164,13 +181,16 @@ struct vhost_net *vhost_net_init(VhostNetOptions *options)
     net->dev.nvqs = 2;
     net->dev.vqs = net->vqs;
 
-    if (backend_kernel) {
+    if (backend_kernel) { //走这里
+
+	    //得到tap设备对应的fd
         r = vhost_net_get_fd(options->net_backend);
         if (r < 0) {
             goto fail;
         }
         net->dev.backend_features = qemu_has_vnet_hdr(options->net_backend)
             ? 0 : (1ULL << VHOST_NET_F_VIRTIO_NET_HDR);
+		 //tap设备对应的fd
         net->backend = r;
         net->dev.protocol_features = 0;
     } else {
@@ -182,6 +202,7 @@ struct vhost_net *vhost_net_init(VhostNetOptions *options)
         net->dev.vq_index = net->nc->queue_index * net->dev.nvqs;
     }
 
+    //去初始化vhost_net->dev对象,设置好内核vhost的virtqueue之类的
     r = vhost_dev_init(&net->dev, options->opaque,
                        options->backend_type, options->busyloop_timeout);
     if (r < 0) {
@@ -211,6 +232,7 @@ struct vhost_net *vhost_net_init(VhostNetOptions *options)
         }
     }
 
+    //设置vhost_net->dev->acked_features
     vhost_net_ack_features(net, features);
 
     return net;
@@ -226,6 +248,13 @@ static void vhost_net_set_vq_index(struct vhost_net *net, int vq_index)
     net->dev.vq_index = vq_index;
 }
 
+/*
+ * virtio_net_set_link_status()
+ *  virtio_net_set_status()
+ *   virtio_net_vhost_status()
+ *    vhost_net_start()
+ *     vhost_net_start_one()
+ */
 static int vhost_net_start_one(struct vhost_net *net,
                                VirtIODevice *dev)
 {
@@ -297,6 +326,14 @@ static void vhost_net_stop_one(struct vhost_net *net,
     vhost_dev_disable_notifiers(&net->dev, dev);
 }
 
+/*
+ * virtio_net_set_link_status()
+ *  virtio_net_set_status()
+ *   virtio_net_vhost_status()
+ *    vhost_net_start()
+ *
+ * ncs是virtio对应的网络后端tap设备
+ */
 int vhost_net_start(VirtIODevice *dev, NetClientState *ncs,
                     int total_queues)
 {
@@ -313,7 +350,10 @@ int vhost_net_start(VirtIODevice *dev, NetClientState *ncs,
     for (i = 0; i < total_queues; i++) {
         struct vhost_net *net;
 
+        //ncs是virtio对应的网络后端tap设备
         net = get_vhost_net(ncs[i].peer);
+
+		//设置vhost_net->dev->vq_index=i*2
         vhost_net_set_vq_index(net, i * 2);
 
         /* Suppress the masking guest notifiers on vhost user
@@ -325,6 +365,9 @@ int vhost_net_start(VirtIODevice *dev, NetClientState *ncs,
         }
      }
 
+    /*
+     * virtio_pci_set_guest_notifiers
+     */
     r = k->set_guest_notifiers(qbus->parent, total_queues * 2, true);
     if (r < 0) {
         error_report("Error binding guest notifier: %d", -r);
@@ -332,6 +375,7 @@ int vhost_net_start(VirtIODevice *dev, NetClientState *ncs,
     }
 
     for (i = 0; i < total_queues; i++) {
+		//开启virtio网卡队列
         r = vhost_net_start_one(get_vhost_net(ncs[i].peer), dev);
 
         if (r < 0) {
@@ -418,7 +462,7 @@ VHostNetState *get_vhost_net(NetClientState *nc)
     }
 
     switch (nc->info->type) {
-    case NET_CLIENT_DRIVER_TAP:
+    case NET_CLIENT_DRIVER_TAP://这里//返回TAPState->vhost_net对象
         vhost_net = tap_get_vhost_net(nc);
         break;
     case NET_CLIENT_DRIVER_VHOST_USER:

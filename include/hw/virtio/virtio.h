@@ -126,6 +126,9 @@ typedef struct VirtioDeviceClass {
     void (*get_config)(VirtIODevice *vdev, uint8_t *config);
     void (*set_config)(VirtIODevice *vdev, const uint8_t *config);
     void (*reset)(VirtIODevice *vdev);
+	/*
+	 * virtio_net_set_status
+	 */
     void (*set_status)(VirtIODevice *vdev, uint8_t val);
     /* For transitional devices, this is a bitmap of features
      * that are only exposed on the legacy interface but not

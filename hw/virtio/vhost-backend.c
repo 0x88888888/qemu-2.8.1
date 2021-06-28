@@ -15,6 +15,21 @@
 #include "hw/virtio/vhost-backend.h"
 #include "qemu/error-report.h"
 
+/*
+ * main() [vl.c]
+ *  net_init_clients() 
+ *   net_init_client() 处理-net参数
+ *    net_client_init()
+ *     net_client_init1()
+ *      net_init_tap()
+ *       net_init_tap()
+ *        net_init_tap_one(model="tap")
+ *         vhost_net_init()
+ *          vhost_dev_init()
+ *           vhost_virtqueue_init()
+ *            vhost_kernel_set_vring_call()
+ *              vhost_kernel_call()
+ */
 static int vhost_kernel_call(struct vhost_dev *dev, unsigned long int request,
                              void *arg)
 {
@@ -43,6 +58,19 @@ static int vhost_kernel_cleanup(struct vhost_dev *dev)
     return close(fd);
 }
 
+/*
+ * main() [vl.c]
+ *	net_init_clients() 
+ *	 net_init_client() 处理-net参数
+ *	  net_client_init()
+ *	   net_client_init1()
+ *		net_init_tap()
+ *		 net_init_tap()
+ *		  net_init_tap_one(model="tap")
+ *         vhost_net_init()
+ *          vhost_dev_init()
+ *           vhost_kernel_memslots_limit()
+ */
 static int vhost_kernel_memslots_limit(struct vhost_dev *dev)
 {
     int limit = 64;
@@ -89,12 +117,36 @@ static int vhost_kernel_set_log_base(struct vhost_dev *dev, uint64_t base,
     return vhost_kernel_call(dev, VHOST_SET_LOG_BASE, &base);
 }
 
+/*
+ * virtio_net_set_link_status()
+ *  virtio_net_set_status()
+ *   virtio_net_vhost_status()
+ *    vhost_net_start()
+ * 	   vhost_net_start_one()
+ * 	    vhost_net_start_one()
+ * 	     vhost_dev_start()
+ *        vhost_kernel_set_mem_table()
+ */
 static int vhost_kernel_set_mem_table(struct vhost_dev *dev,
                                       struct vhost_memory *mem)
 {
     return vhost_kernel_call(dev, VHOST_SET_MEM_TABLE, mem);
 }
 
+  /*
+   * virtio_net_set_link_status()
+   *  virtio_net_set_status()
+   *   virtio_net_vhost_status()
+   *	vhost_net_start()
+   *	 vhost_net_start_one()
+   *	  vhost_net_start_one()
+   *	   vhost_dev_start()
+   *		vhost_virtqueue_start()
+   *		 vhost_virtqueue_set_addr()
+   *          vhost_kernel_set_vring_addr()
+   *
+   * 把vring的地址通知给vhost
+   */
 static int vhost_kernel_set_vring_addr(struct vhost_dev *dev,
                                        struct vhost_vring_addr *addr)
 {
@@ -113,6 +165,17 @@ static int vhost_kernel_set_vring_num(struct vhost_dev *dev,
     return vhost_kernel_call(dev, VHOST_SET_VRING_NUM, ring);
 }
 
+  /*
+   * virtio_net_set_link_status()
+   *  virtio_net_set_status()
+   *   virtio_net_vhost_status()
+   *	vhost_net_start()
+   *	 vhost_net_start_one()
+   *	  vhost_net_start_one()
+   *	   vhost_dev_start()
+   *		vhost_virtqueue_start()
+   *         vhost_kernel_set_vring_base()
+   */
 static int vhost_kernel_set_vring_base(struct vhost_dev *dev,
                                        struct vhost_vring_state *ring)
 {
@@ -125,12 +188,41 @@ static int vhost_kernel_get_vring_base(struct vhost_dev *dev,
     return vhost_kernel_call(dev, VHOST_GET_VRING_BASE, ring);
 }
 
+/*
+ * virtio_net_set_link_status()
+ *  virtio_net_set_status()
+ *   virtio_net_vhost_status()
+ *    vhost_net_start()
+ *     vhost_net_start_one()
+ *	    vhost_net_start_one()
+ *       vhost_dev_start()
+ *        vhost_virtqueue_start()
+ *         vhost_kernel_set_vring_kick()
+ * 
+ * 将VirtQueue的host_notifier成员对应的fd传递给vhost
+ */
 static int vhost_kernel_set_vring_kick(struct vhost_dev *dev,
                                        struct vhost_vring_file *file)
 {
     return vhost_kernel_call(dev, VHOST_SET_VRING_KICK, file);
 }
 
+/*
+ * main() [vl.c]
+ *  net_init_clients() 
+ *   net_init_client() 处理-net参数
+ *    net_client_init()
+ *     net_client_init1()
+ *      net_init_tap()
+ *       net_init_tap()
+ *        net_init_tap_one(model="tap")
+ *         vhost_net_init()
+ *          vhost_dev_init()
+ *           vhost_virtqueue_init()
+ *            vhost_kernel_set_vring_call()
+ *
+ * 将VirtQueue的guest_notifier成员对应的fd传递给vhost
+ */
 static int vhost_kernel_set_vring_call(struct vhost_dev *dev,
                                        struct vhost_vring_file *file)
 {
@@ -185,6 +277,10 @@ static int vhost_kernel_vsock_set_running(struct vhost_dev *dev, int start)
 }
 #endif /* CONFIG_VHOST_VSOCK */
 
+/*
+ * 大部分成员都直接操作 /dev/vhost-net 的fd
+ * 用来配置vhost-net中virtio的后端
+ */
 static const VhostOps kernel_ops = {
         .backend_type = VHOST_BACKEND_TYPE_KERNEL,
         .vhost_backend_init = vhost_kernel_init,

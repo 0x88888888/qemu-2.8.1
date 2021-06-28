@@ -11,7 +11,7 @@ typedef struct VhostNetOptions {
     VhostBackendType backend_type;
     NetClientState *net_backend;
     uint32_t busyloop_timeout;
-    void *opaque;
+    void *opaque;//保存/dev/vhost-net,这个设备文件就是内核代码的vhost_net_misc对象
 } VhostNetOptions;
 
 uint64_t vhost_net_get_max_queues(VHostNetState *net);

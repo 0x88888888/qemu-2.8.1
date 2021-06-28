@@ -51,6 +51,9 @@ typedef struct VirtioBusClass {
     int (*load_extra_state)(DeviceState *d, QEMUFile *f);
     bool (*has_extra_state)(DeviceState *d);
     bool (*query_guest_notifiers)(DeviceState *d);
+	/*
+	 * virtio_pci_set_guest_notifiers
+	 */
     int (*set_guest_notifiers)(DeviceState *d, int nvqs, bool assign);
     void (*vmstate_change)(DeviceState *d, bool running);
     /*

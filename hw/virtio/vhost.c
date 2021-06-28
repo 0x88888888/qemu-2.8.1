@@ -695,6 +695,19 @@ static void vhost_region_nop(MemoryListener *listener,
 {
 }
 
+ /*
+  * virtio_net_set_link_status()
+  *  virtio_net_set_status()
+  *   virtio_net_vhost_status()
+  *    vhost_net_start()
+  * 	vhost_net_start_one()
+  * 	 vhost_net_start_one()
+  * 	  vhost_dev_start()
+  * 	   vhost_virtqueue_start()
+  *         vhost_virtqueue_set_addr()
+  *
+  * 把vring的地址通知给vhost
+  */
 static int vhost_virtqueue_set_addr(struct vhost_dev *dev,
                                     struct vhost_virtqueue *vq,
                                     unsigned idx, bool enable_log)
@@ -707,6 +720,7 @@ static int vhost_virtqueue_set_addr(struct vhost_dev *dev,
         .log_guest_addr = vq->used_phys,
         .flags = enable_log ? (1 << VHOST_VRING_F_LOG) : 0,
     };
+		//vhost_kernel_set_vring_addr
     int r = dev->vhost_ops->vhost_set_vring_addr(dev, &addr);
     if (r < 0) {
         VHOST_OPS_DEBUG("vhost_set_vring_addr failed");
@@ -858,6 +872,17 @@ static int vhost_virtqueue_set_vring_endian_legacy(struct vhost_dev *dev,
     return -errno;
 }
 
+/*
+ * virtio_net_set_link_status()
+ *  virtio_net_set_status()
+ *   virtio_net_vhost_status()
+ *    vhost_net_start()
+ *     vhost_net_start_one()
+ *	    vhost_net_start_one()
+ *       vhost_dev_start()
+ *        vhost_virtqueue_start()
+ *
+ */
 static int vhost_virtqueue_start(struct vhost_dev *dev,
                                 struct VirtIODevice *vdev,
                                 struct vhost_virtqueue *vq,
@@ -879,6 +904,7 @@ static int vhost_virtqueue_start(struct vhost_dev *dev,
 
 
     vq->num = state.num = virtio_queue_get_num(vdev, idx);
+	//设置vring的个数
     r = dev->vhost_ops->vhost_set_vring_num(dev, &state);
     if (r) {
         VHOST_OPS_DEBUG("vhost_set_vring_num failed");
@@ -886,6 +912,7 @@ static int vhost_virtqueue_start(struct vhost_dev *dev,
     }
 
     state.num = virtio_queue_get_last_avail_idx(vdev, idx);
+	//vhost_kernel_set_vring_base
     r = dev->vhost_ops->vhost_set_vring_base(dev, &state);
     if (r) {
         VHOST_OPS_DEBUG("vhost_set_vring_base failed");
@@ -930,6 +957,7 @@ static int vhost_virtqueue_start(struct vhost_dev *dev,
     }
 
     file.fd = event_notifier_get_fd(virtio_queue_get_host_notifier(vvq));
+	//vhost_kernel_set_vring_kick
     r = dev->vhost_ops->vhost_set_vring_kick(dev, &file);
     if (r) {
         VHOST_OPS_DEBUG("vhost_set_vring_kick failed");
@@ -952,6 +980,7 @@ static int vhost_virtqueue_start(struct vhost_dev *dev,
         k->query_guest_notifiers(qbus->parent) &&
         virtio_queue_vector(vdev, idx) == VIRTIO_NO_VECTOR) {
         file.fd = -1;
+		//vhost_kernel_set_vring_call
         r = dev->vhost_ops->vhost_set_vring_call(dev, &file);
         if (r) {
             goto fail_vector;
@@ -1046,6 +1075,19 @@ static int vhost_virtqueue_set_busyloop_timeout(struct vhost_dev *dev,
     return 0;
 }
 
+/*
+ * main() [vl.c]
+ *	net_init_clients() 
+ *	 net_init_client() 处理-net参数
+ *	  net_client_init()
+ *	   net_client_init1()
+ *		net_init_tap()
+ *		 net_init_tap()
+ *		  net_init_tap_one(model="tap")
+ *		   vhost_net_init()
+ *			vhost_dev_init()
+ *           vhost_virtqueue_init()
+ */
 static int vhost_virtqueue_init(struct vhost_dev *dev,
                                 struct vhost_virtqueue *vq, int n)
 {
@@ -1053,12 +1095,14 @@ static int vhost_virtqueue_init(struct vhost_dev *dev,
     struct vhost_vring_file file = {
         .index = vhost_vq_index,
     };
+    //初始化一个eventfd，保存在vhost_virtqueue->masked_notifier
     int r = event_notifier_init(&vq->masked_notifier, 0);
     if (r < 0) {
         return r;
     }
 
     file.fd = event_notifier_get_fd(&vq->masked_notifier);
+	// vhost_kernel_set_vring_call
     r = dev->vhost_ops->vhost_set_vring_call(dev, &file);
     if (r) {
         VHOST_OPS_DEBUG("vhost_set_vring_call failed");
@@ -1086,7 +1130,7 @@ static void vhost_virtqueue_cleanup(struct vhost_virtqueue *vq)
  *		 net_init_tap()
  *		  net_init_tap_one(model="tap")
  *         vhost_net_init()
- *          vhost_dev_init()
+ *          vhost_dev_init(hdev=vhost_net->dev)
  */
 int vhost_dev_init(struct vhost_dev *hdev, void *opaque,
                    VhostBackendType backend_type, uint32_t busyloop_timeout)
@@ -1096,9 +1140,11 @@ int vhost_dev_init(struct vhost_dev *hdev, void *opaque,
 
     hdev->migration_blocker = NULL;
 
+    //设置vhost_net->dev->vhost_ops = &kernel_ops
     r = vhost_set_backend_type(hdev, backend_type);
     assert(r >= 0);
 
+    //vhost_kernel_memslots_limit
     r = hdev->vhost_ops->vhost_backend_init(hdev, opaque);
     if (r < 0) {
         goto fail;
@@ -1124,6 +1170,7 @@ int vhost_dev_init(struct vhost_dev *hdev, void *opaque,
     }
 
     for (i = 0; i < hdev->nvqs; ++i, ++n_initialized_vqs) {
+		 //去内核设置好vhost 的vring
         r = vhost_virtqueue_init(hdev, hdev->vqs + i, hdev->vq_index + i);
         if (r < 0) {
             goto fail;
@@ -1180,6 +1227,10 @@ int vhost_dev_init(struct vhost_dev *hdev, void *opaque,
     hdev->log_enabled = false;
     hdev->started = false;
     hdev->memory_changed = false;
+	/*
+	 * 注册到address_space_memory,这个memory_listener用来控制migrate中的脏页记录
+	 * 在没有使用vhost之前，脏页被通过ept进行标脏处理,使用vhost后,vhost也会标脏内存，所以要放法来处理这种情况
+	*/
     memory_listener_register(&hdev->memory_listener, &address_space_memory);
     QLIST_INSERT_HEAD(&vhost_devices, hdev, entry);
     return 0;
@@ -1344,7 +1395,17 @@ void vhost_ack_features(struct vhost_dev *hdev, const int *feature_bits,
     }
 }
 
-/* Host notifiers must be enabled at this point. */
+/*
+ * virtio_net_set_link_status()
+ *  virtio_net_set_status()
+ *   virtio_net_vhost_status()
+ *    vhost_net_start()
+ *     vhost_net_start_one()
+ *      vhost_net_start_one()
+ *       vhost_dev_start()
+ *
+ * Host notifiers must be enabled at this point. 
+ */
 int vhost_dev_start(struct vhost_dev *hdev, VirtIODevice *vdev)
 {
     int i, r;
@@ -1358,6 +1419,7 @@ int vhost_dev_start(struct vhost_dev *hdev, VirtIODevice *vdev)
     if (r < 0) {
         goto fail_features;
     }
+	//vhost_kernel_set_mem_table
     r = hdev->vhost_ops->vhost_set_mem_table(hdev, hdev->mem);
     if (r < 0) {
         VHOST_OPS_DEBUG("vhost_set_mem_table failed");
@@ -1365,6 +1427,7 @@ int vhost_dev_start(struct vhost_dev *hdev, VirtIODevice *vdev)
         goto fail_mem;
     }
     for (i = 0; i < hdev->nvqs; ++i) {
+		
         r = vhost_virtqueue_start(hdev,
                                   vdev,
                                   hdev->vqs + i,

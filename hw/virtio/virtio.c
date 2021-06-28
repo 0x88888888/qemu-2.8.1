@@ -981,6 +981,7 @@ int virtio_set_status(VirtIODevice *vdev, uint8_t val)
         }
     }
     if (k->set_status) {
+		//virtio_net_set_status
         k->set_status(vdev, val);
     }
     vdev->status = val;
