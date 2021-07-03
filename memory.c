@@ -642,7 +642,7 @@ static AddressSpace *memory_region_to_address_space(MemoryRegion *mr)
  * memory_region_transaction_commit()
  *  address_space_update_topology()
  *   generate_memory_topology()
- *    render_memory_region()
+ *    render_memory_region(readonly==false)
  *
  * 这个函数是MemoryRegion 进行Flat的核心函数
  */
@@ -665,8 +665,10 @@ static void render_memory_region(FlatView *view,
     }
 
     int128_addto(&base, int128_make64(mr->addr));
+	//确定是否readonly
     readonly |= mr->readonly;
 
+    //根据mr,产生AddrRange
     tmp = addrrange_make(base, mr->size);
 
     
@@ -692,7 +694,7 @@ static void render_memory_region(FlatView *view,
         render_memory_region(view, subregion, base, clip, readonly);
     }
 
-    if (!mr->terminates) {//非叶子节点
+    if (!mr->terminates) {//非叶子节点,只有也在节点才能产生AddrRange
         return;
     }
 
@@ -716,6 +718,7 @@ static void render_memory_region(FlatView *view,
                              int128_sub(view->ranges[i].addr.start, base));
             fr.offset_in_region = offset_in_region;
             fr.addr = addrrange_make(base, now);
+			//将FlatRange插入到FlatView中去
             flatview_insert(view, i, &fr);
             ++i;
             int128_addto(&base, now);
@@ -872,11 +875,13 @@ static void address_space_update_ioeventfds(AddressSpace *as)
  * memory_region_transaction_commit()
  *  address_space_update_topology()
  *   address_space_update_topology_pass()
+ *
+ * 更新flatview->ranges,调用listeners,把内存的布局信息同步到内核中去u
  */
 static void address_space_update_topology_pass(AddressSpace *as,
                                                const FlatView *old_view,
                                                const FlatView *new_view,
-                                               bool adding)
+                                               bool adding /* 这个参数用于控制是否调用listeners */)
 {
     unsigned iold, inew;
     FlatRange *frold, *frnew;
@@ -904,7 +909,7 @@ static void address_space_update_topology_pass(AddressSpace *as,
                     && !flatrange_equal(frold, frnew)))) {
             /* In old but not in new, or in both but attributes changed. */
 
-            if (!adding) {
+            if (!adding) {//调用listners->region_del
                 MEMORY_LISTENER_UPDATE_REGION(frold, as, Reverse, region_del);
             }
 
@@ -912,7 +917,8 @@ static void address_space_update_topology_pass(AddressSpace *as,
         } else if (frold && frnew && flatrange_equal(frold, frnew)) {
             /* In both and unchanged (except logging may have changed) */
 
-            if (adding) {
+            if (adding) {//添加
+            
                 MEMORY_LISTENER_UPDATE_REGION(frnew, as, Forward, region_nop);
                 if (frnew->dirty_log_mask & ~frold->dirty_log_mask) {
                     MEMORY_LISTENER_UPDATE_REGION(frnew, as, Forward, log_start,
@@ -931,7 +937,8 @@ static void address_space_update_topology_pass(AddressSpace *as,
         } else {
             /* In new */
 
-            if (adding) {
+            if (adding) {//添加
+                //调用listners->region_add
                 MEMORY_LISTENER_UPDATE_REGION(frnew, as, Forward, region_add);
             }
 
@@ -949,9 +956,10 @@ static void address_space_update_topology_pass(AddressSpace *as,
 static void address_space_update_topology(AddressSpace *as)
 {
     FlatView *old_view = address_space_get_flatview(as);
-	//将AddressSpace->root图中的内存Flat化
+	//将AddressSpace->root图中的内存Flat化,产生FlatView->ranges
     FlatView *new_view = generate_memory_topology(as->root);
 
+    //更新flatview->ranges,调用listeners,把内存的布局信息同步到内核中去u
     address_space_update_topology_pass(as, old_view, new_view, false);
     address_space_update_topology_pass(as, old_view, new_view, true);
 
@@ -997,6 +1005,7 @@ void memory_region_transaction_commit(void)
     assert(memory_region_transaction_depth);
     --memory_region_transaction_depth;
     if (!memory_region_transaction_depth) {
+		
         if (memory_region_update_pending) {
 			//调用MemoryListener->begin函数
             MEMORY_LISTENER_CALL_GLOBAL(begin, Forward);
@@ -1009,6 +1018,7 @@ void memory_region_transaction_commit(void)
             //调用MemoryListener->commit函数,通知到KVM
             MEMORY_LISTENER_CALL_GLOBAL(commit, Forward);
         } else if (ioeventfd_update_pending) {
+			
             QTAILQ_FOREACH(as, &address_spaces, address_spaces_link) {
                 address_space_update_ioeventfds(as);
             }
@@ -2178,6 +2188,7 @@ void memory_region_add_subregion_overlap(MemoryRegion *mr,
                                          MemoryRegion *subregion,
                                          int priority)
 {
+    //有优先级，允许两个与mr中已经有的subregion表示的范围有重叠
     subregion->priority = priority;
     memory_region_add_subregion_common(mr, offset, subregion);
 }
@@ -2691,6 +2702,8 @@ static void mtree_print_mr(fprintf_function mon_printf, void *f,
 /*
  * hmp_info_mtree()
  *  mtree_info()
+ *
+ * 打印AddressSpace信息
  */
 void mtree_info(fprintf_function mon_printf, void *f)
 {
@@ -2702,6 +2715,7 @@ void mtree_info(fprintf_function mon_printf, void *f)
 
     QTAILQ_FOREACH(as, &address_spaces, address_spaces_link) {
         mon_printf(f, "address-space: %s\n", as->name);
+		//打印MemoryRegion信息
         mtree_print_mr(mon_printf, f, as->root, 1, 0, &ml_head);
         mon_printf(f, "\n");
     }

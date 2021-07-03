@@ -1755,6 +1755,7 @@ RAMBlock *qemu_ram_alloc_internal(ram_addr_t size, ram_addr_t max_size,
 
     size = HOST_PAGE_ALIGN(size);
     max_size = HOST_PAGE_ALIGN(max_size);
+	//填好RAMBlock对象
     new_block = g_malloc0(sizeof(*new_block));
     new_block->mr = mr;
     new_block->resized = resized;
@@ -3492,7 +3493,16 @@ void stl_phys_notdirty(AddressSpace *as, hwaddr addr, uint32_t val)
     address_space_stl_notdirty(as, addr, val, MEMTXATTRS_UNSPECIFIED, NULL);
 }
 
-/* warning: addr must be aligned */
+/*
+ * msi_write_config()
+ * e1000e_send_msi()
+ *  msi_notify()
+ *   msi_send_message()
+ *    address_space_stl_le()
+ *     address_space_stl_internal()
+ *
+ * warning: addr must be aligned 
+ */
 static inline void address_space_stl_internal(AddressSpace *as,
                                               hwaddr addr, uint32_t val,
                                               MemTxAttrs attrs,
@@ -3507,6 +3517,7 @@ static inline void address_space_stl_internal(AddressSpace *as,
     bool release_lock = false;
 
     rcu_read_lock();
+	//得到对应的mr
     mr = address_space_translate(as, addr, &addr1, &l,
                                  true);
     if (l < 4 || !memory_access_is_direct(mr, true)) {
@@ -3521,6 +3532,7 @@ static inline void address_space_stl_internal(AddressSpace *as,
             val = bswap32(val);
         }
 #endif
+        //kvm_apic_mem_write会被调用
         r = memory_region_dispatch_write(mr, addr1, val, 4, attrs);
     } else {
         /* RAM case */
@@ -3555,6 +3567,13 @@ void address_space_stl(AddressSpace *as, hwaddr addr, uint32_t val,
                                DEVICE_NATIVE_ENDIAN);
 }
 
+/*
+ * msi_write_config()
+ * e1000e_send_msi()
+ *  msi_notify()
+ *   msi_send_message()
+ *    address_space_stl_le()
+ */
 void address_space_stl_le(AddressSpace *as, hwaddr addr, uint32_t val,
                        MemTxAttrs attrs, MemTxResult *result)
 {

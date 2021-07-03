@@ -53,6 +53,7 @@ struct PCMachineState {
     ISADevice *rtc;
     PCIBus *bus;
     FWCfgState *fw_cfg;
+	//VM的中断信息,中断号，中断处理函数,这是一个数组,在pc_init1中设置
     qemu_irq *gsi;
 
     /* Configuration options: */
@@ -78,7 +79,10 @@ struct PCMachineState {
     uint64_t *node_mem;
 
     /* Address space used by IOAPIC device. All IOAPIC interrupts
-     * will be translated to MSI messages in the address space. */
+     * will be translated to MSI messages in the address space. 
+     *
+     * 在pc_memory_init中设置为address_space_memory
+     */
     AddressSpace *ioapic_as;
 };
 
@@ -194,6 +198,9 @@ void ioapic_dump_state(Monitor *mon, const QDict *qdict);
 
 #define GSI_NUM_PINS IOAPIC_NUM_PINS
 
+/*
+ * 管理中断控制器，中断号，中断处理函数
+ */
 typedef struct GSIState {
     qemu_irq i8259_irq[ISA_NUM_IRQS];
     qemu_irq ioapic_irq[IOAPIC_NUM_PINS];

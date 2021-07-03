@@ -343,7 +343,7 @@ static void i440fx_realize(PCIDevice *dev, Error **errp)
  */
 PCIBus *i440fx_init(const char *host_type /* 北桥的类型名称 */, const char *pci_type /* 北桥对应的pci设备的名字 */,
                     PCII440FXState **pi440fx_state,
-                    int *piix3_devfn,
+                    int *piix3_devfn, // 南桥
                     ISABus **isa_bus, qemu_irq *pic,
                     MemoryRegion *address_space_mem,
                     MemoryRegion *address_space_io,

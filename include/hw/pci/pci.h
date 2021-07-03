@@ -210,7 +210,13 @@ typedef struct PCIDeviceClass {
     void (*realize)(PCIDevice *dev, Error **errp);
     int (*init)(PCIDevice *dev);/* TODO convert to realize() and remove */
     PCIUnregisterFunc *exit;
+	/*
+	 * vfio_pci_read_config
+	 */
     PCIConfigReadFunc *config_read;
+	/*
+	 * vfio_pci_write_config,这个函数会触发msi中断
+	 */
     PCIConfigWriteFunc *config_write;
 
     uint16_t vendor_id;

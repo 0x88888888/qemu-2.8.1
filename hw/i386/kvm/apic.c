@@ -177,6 +177,10 @@ static void kvm_apic_external_nmi(APICCommonState *s)
     run_on_cpu(CPU(s->cpu), do_inject_external_nmi, RUN_ON_CPU_HOST_PTR(s));
 }
 
+/*
+ * kvm_apic_mem_write()
+ *  kvm_send_msi()
+ */
 static void kvm_send_msi(MSIMessage *msg)
 {
     int ret;
@@ -194,6 +198,16 @@ static uint64_t kvm_apic_mem_read(void *opaque, hwaddr addr,
     return ~(uint64_t)0;
 }
 
+/*
+ * msi_write_config()
+ * e1000e_send_msi()
+ *  msi_notify()
+ *   msi_send_message()
+ *    address_space_stl_le()
+ *     address_space_stl_internal()
+ *      ....
+ *       kvm_apic_mem_write()
+ */
 static void kvm_apic_mem_write(void *opaque, hwaddr addr,
                                uint64_t data, unsigned size)
 {

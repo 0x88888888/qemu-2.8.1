@@ -69,6 +69,8 @@ GSource *iohandler_get_g_source(void)
  *          tap_read_poll(enable=true) 
  *           tap_update_fd_handler(s->enable==true)
  *            qemu_set_fd_handler(fd_read==tap_send, fd_write==tap_writable)
+ *
+ * vfio_msi_enable(fd_write==vfio_msi_interrupt)
  */
 void qemu_set_fd_handler(int fd,
                          IOHandler *fd_read,

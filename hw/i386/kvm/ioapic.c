@@ -51,6 +51,7 @@ void kvm_pc_setup_irq_routing(bool pci_enabled)
                 }
             }
         }
+		//提交中断路由信息到kvm
         kvm_irqchip_commit_routes(s);
     }
 }
@@ -149,12 +150,22 @@ static void kvm_ioapic_set_irq(void *opaque, int irq, int level)
     apic_report_irq_delivered(delivered);
 }
 
+/*
+ * main()
+ *  DEFINE_I440FX_MACHINE 定于出来的函数pc_init_##suffix()调用
+ *   pc_init1(host_type=TYPE_I440FX_PCI_HOST_BRIDGE, //北桥的类型
+			 pci_type=TYPE_I440FX_PCI_DEVICE //北桥对应的pci设备的名字 )
+ *    ioapic_init_gsi() 			 
+ *     ......
+ *      kvm_ioapic_realize()
+ */
 static void kvm_ioapic_realize(DeviceState *dev, Error **errp)
 {
     IOAPICCommonState *s = IOAPIC_COMMON(dev);
 
     memory_region_init_reservation(&s->io_memory, NULL, "kvm-ioapic", 0x1000);
 
+    //创建qemu_irq数组,设置中断处理函数为kvm_ioapic_set_irq
     qdev_init_gpio_in(dev, kvm_ioapic_set_irq, IOAPIC_NUM_PINS);
 }
 

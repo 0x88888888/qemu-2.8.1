@@ -134,6 +134,10 @@ struct TranslationBlock;
  * @disas_set_info: Setup architecture specific components of disassembly info
  *
  * Represents a CPU family or model.
+ *
+ *
+ * CPUClass保存一些与cpu family 相关的处理函数,比如interrupt, mmu fault handling
+ * CPUState保存一些与cpu相关的状态，比如running state,configured breakpoints,last exception raised
  */
 typedef struct CPUClass {
     /*< private >*/
@@ -146,6 +150,7 @@ typedef struct CPUClass {
     void (*reset)(CPUState *cpu);
     int reset_dump_flags;
     bool (*has_work)(CPUState *cpu);
+	//中断处理
     void (*do_interrupt)(CPUState *cpu);
     CPUUnassignedAccess do_unassigned_access;
     void (*do_unaligned_access)(CPUState *cpu, vaddr addr,
@@ -164,12 +169,14 @@ typedef struct CPUClass {
                                Error **errp);
     void (*set_pc)(CPUState *cpu, vaddr value);
     void (*synchronize_from_tb)(CPUState *cpu, struct TranslationBlock *tb);
+	//缺页处理
     int (*handle_mmu_fault)(CPUState *cpu, vaddr address, int rw,
                             int mmu_index);
     hwaddr (*get_phys_page_debug)(CPUState *cpu, vaddr addr);
     hwaddr (*get_phys_page_attrs_debug)(CPUState *cpu, vaddr addr,
                                         MemTxAttrs *attrs);
     int (*asidx_from_attrs)(CPUState *cpu, MemTxAttrs attrs);
+	//调试处理
     int (*gdb_read_register)(CPUState *cpu, uint8_t *buf, int reg);
     int (*gdb_write_register)(CPUState *cpu, uint8_t *buf, int reg);
     bool (*debug_check_watchpoint)(CPUState *cpu, CPUWatchpoint *wp);
@@ -301,6 +308,10 @@ struct qemu_work_item;
  *
  * 所有CPU都同样的数据
  * 嵌入到X86CPU中
+ *
+ * CPUClass保存一些与cpu family 相关的处理函数,比如interrupt, mmu fault handling
+ * CPUState保存一些与cpu相关的状态，比如running state,configured breakpoints,last exception raised
+ * 
  */
 struct CPUState {
     /*< private >*/
@@ -311,6 +322,7 @@ struct CPUState {
     int nr_threads;
     int numa_node;
 
+    //代表这个线程的QemuThread
     struct QemuThread *thread;
 #ifdef _WIN32
     HANDLE hThread;
@@ -328,6 +340,7 @@ struct CPUState {
     bool exit_request;
 	//表明设备是否有对vCPU中断请求
     uint32_t interrupt_request;
+	//是否处于单步执行状态
     int singlestep_enabled;
     int64_t icount_extra;
     sigjmp_buf jmp_env;

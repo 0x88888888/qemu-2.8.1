@@ -31,7 +31,11 @@
 struct IRQState {
     Object parent_obj;
 
+    /*
+     * kvm_ioapic_set_irq
+     */
     qemu_irq_handler handler;
+	//指向GSIState对象
     void *opaque;
     int n;
 };

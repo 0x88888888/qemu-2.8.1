@@ -748,12 +748,12 @@ static void pc_build_smbios(FWCfgState *fw_cfg)
 }
 
 /*
- * DEFINE_I440FX_MACHINE 定于出来的函数pc_init_##suffix()调用
- *  pc_init1()
- *   pc_memory_init()
- *    bochs_bios_init(as=address_space_memory)
+ * main()
+ *  DEFINE_I440FX_MACHINE 定于出来的函数pc_init_##suffix()调用
+ *   pc_init1()
+ *    pc_memory_init()
+ *     bochs_bios_init(as=address_space_memory)
  */
-
 static FWCfgState *bochs_bios_init(AddressSpace *as, PCMachineState *pcms)
 {
     FWCfgState *fw_cfg;
@@ -841,6 +841,13 @@ struct setup_data {
     uint8_t data[0];
 } __attribute__((packed));
 
+/*
+ * main()
+ *  DEFINE_I440FX_MACHINE 定于出来的函数pc_init_##suffix()调用
+ *   pc_init1()
+ *    pc_memory_init()
+ *     load_linux()
+ */
 static void load_linux(PCMachineState *pcms,
                        FWCfgState *fw_cfg)
 {
@@ -1406,9 +1413,10 @@ void xen_load_linux(PCMachineState *pcms)
 }
 
 /*
- * DEFINE_I440FX_MACHINE 定于出来的函数pc_init_##suffix()调用
- *  pc_init1()
- *   pc_memory_init()
+ * main()
+ *  DEFINE_I440FX_MACHINE 定于出来的函数pc_init_##suffix()调用
+ *   pc_init1()
+ *    pc_memory_init()
  *
  *
  * 内存初始化，这些host的虚拟内存会作为guest os的物理内存用
@@ -1765,15 +1773,16 @@ void ioapic_init_gsi(GSIState *gsi_state, const char *parent_name)
     SysBusDevice *d;
     unsigned int i;
 
-    if (kvm_ioapic_in_kernel()) {
+    if (kvm_ioapic_in_kernel()) { //在内核kvm模拟ioapic
         dev = qdev_create(NULL, "kvm-ioapic");
-    } else {
+    } else {//在qemu中模拟ioapic
         dev = qdev_create(NULL, "ioapic");
     }
     if (parent_name) {
         object_property_add_child(object_resolve_path(parent_name, NULL),
                                   "ioapic", OBJECT(dev), NULL);
     }
+	//realize化,最终会调用到kvm_ioapic_realize
     qdev_init_nofail(dev);
     d = SYS_BUS_DEVICE(dev);
 	//应谁mmio地址空间

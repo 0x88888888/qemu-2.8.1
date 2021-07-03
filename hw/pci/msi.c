@@ -309,6 +309,11 @@ static bool msi_is_masked(const PCIDevice *dev, unsigned int vector)
     return mask & (1U << vector);
 }
 
+/*
+ * msi_write_config()
+ * e1000e_send_msi()
+ *  msi_notify()
+ */
 void msi_notify(PCIDevice *dev, unsigned int vector)
 {
     uint16_t flags = pci_get_word(dev->config + msi_flags_off(dev));
@@ -325,6 +330,7 @@ void msi_notify(PCIDevice *dev, unsigned int vector)
         return;
     }
 
+    //组装好msg->address, msg->data
     msg = msi_get_message(dev, vector);
 
     MSI_DEV_PRINTF(dev,
@@ -334,6 +340,12 @@ void msi_notify(PCIDevice *dev, unsigned int vector)
     msi_send_message(dev, msg);
 }
 
+/*
+ * msi_write_config()
+ * e1000e_send_msi()
+ *  msi_notify()
+ *   msi_send_message()
+ */
 void msi_send_message(PCIDevice *dev, MSIMessage msg)
 {
     MemTxAttrs attrs = {};

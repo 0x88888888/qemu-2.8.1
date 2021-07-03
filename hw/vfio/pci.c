@@ -377,6 +377,7 @@ static void vfio_msi_interrupt(void *opaque)
 
     msg = get_msg(&vdev->pdev, nr);
     trace_vfio_msi_interrupt(vdev->vbasedev.name, nr, msg.address, msg.data);
+	//通过kvm发送中断信息
     notify(&vdev->pdev, nr);
 }
 
@@ -1179,7 +1180,7 @@ void vfio_pci_write_config(PCIDevice *pdev,
         is_enabled = msi_enabled(pdev);
 
         if (!was_enabled) {
-            if (is_enabled) {
+            if (is_enabled) { //开启vfio mis中断功能
                 vfio_msi_enable(vdev);
             }
         } else {

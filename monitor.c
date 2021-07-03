@@ -1529,6 +1529,9 @@ static void hmp_boot_set(Monitor *mon, const QDict *qdict)
     }
 }
 
+/*
+ * 打印address_space信息
+ */
 static void hmp_info_mtree(Monitor *mon, const QDict *qdict)
 {
     mtree_info((fprintf_function)monitor_printf, mon);

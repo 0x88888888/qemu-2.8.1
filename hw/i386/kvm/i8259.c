@@ -126,6 +126,13 @@ static void kvm_pic_realize(DeviceState *dev, Error **errp)
     kpc->parent_realize(dev, errp);
 }
 
+/*
+ * main()
+ *  DEFINE_I440FX_MACHINE 定于出来的函数pc_init_##suffix()调用
+ *   pc_init1(host_type=TYPE_I440FX_PCI_HOST_BRIDGE, //北桥的类型
+              pci_type=TYPE_I440FX_PCI_DEVICE //北桥对应的pci设备的名字 )
+ *    kvm_i8259_init()
+ */
 qemu_irq *kvm_i8259_init(ISABus *bus)
 {
     i8259_init_chip(TYPE_KVM_I8259, bus, true);

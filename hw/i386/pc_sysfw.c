@@ -85,7 +85,14 @@ static void pc_isa_bios_init(MemoryRegion *rom_memory,
  */
 #define FLASH_MAP_BASE_MIN ((hwaddr)(0x100000000ULL - 8*1024*1024))
 
-/* This function maps flash drives from 4G downward, in order of their unit
+/*
+ * main()
+ *  DEFINE_I440FX_MACHINE 定于出来的函数pc_init_##suffix()调用
+ *   pc_init1()
+ *    pc_memory_init()
+ *     pc_system_flash_init()
+ *
+ * This function maps flash drives from 4G downward, in order of their unit
  * numbers. The mapping starts at unit#0, with unit number increments of 1, and
  * stops before the first missing flash drive, or before
  * unit#FLASH_MAP_UNIT_MAX, whichever is reached first.
@@ -242,10 +249,12 @@ static void old_pc_system_rom_init(MemoryRegion *rom_memory, bool isapc_ram_fw)
 }
 
 /*
- * DEFINE_I440FX_MACHINE 定于出来的函数pc_init_##suffix()调用
- *  pc_init1()
- *   pc_memory_init()
+ * main()
+ *  DEFINE_I440FX_MACHINE 定于出来的函数pc_init_##suffix()调用
+ *   pc_init1()
+ *    pc_memory_init()
  *
+ * 加载bios.bin文件
  */
 void pc_system_firmware_init(MemoryRegion *rom_memory, bool isapc_ram_fw)
 {

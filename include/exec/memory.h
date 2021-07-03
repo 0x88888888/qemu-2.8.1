@@ -201,6 +201,8 @@ typedef struct MemoryRegionIoeventfd MemoryRegionIoeventfd;
  * system_memory, system_io 
  *
  * MemoryRegion展开后的内存拓扑由FlatRange表示
+ *
+ * 叶子节点是分配给VM的MMIO或者内存，中间节点则表示内存总线
  */
 struct MemoryRegion {
     Object parent_obj;
@@ -246,6 +248,7 @@ struct MemoryRegion {
     bool enabled;
     bool warning_printed; /* For reservations */
     uint8_t vga_logging_count;
+	//如果只是一个alias,在flat的时候，要用这个alias指针指向的MemoryRegion去使用
     MemoryRegion *alias;
     hwaddr alias_offset;
 	/*
@@ -328,6 +331,10 @@ struct MemoryListener {
                         bool match_data, uint64_t data, EventNotifier *e);
     void (*eventfd_del)(MemoryListener *listener, MemoryRegionSection *section,
                         bool match_data, uint64_t data, EventNotifier *e);
+	/*
+	 * kvm_coalesce_mmio_region_add
+	 * kvm_coalesce_mmio_region_del
+	 */
     void (*coalesced_mmio_add)(MemoryListener *listener, MemoryRegionSection *section,
                                hwaddr addr, hwaddr len);
     void (*coalesced_mmio_del)(MemoryListener *listener, MemoryRegionSection *section,
@@ -386,6 +393,8 @@ struct AddressSpace {
 	/* 
 	 * 链接MemoryListener->link_as
 	 * 本AddressSpace所有的MemoryListener都这个这个链表上面了
+	 *
+	 * VM内存布局发生变化的时候，要调用这些listeners
 	 */
     QTAILQ_HEAD(memory_listeners_as, MemoryListener) listeners;
 	/*

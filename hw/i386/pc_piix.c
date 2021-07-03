@@ -84,7 +84,7 @@ static void pc_init1(MachineState *machine,
     PCIBus *pci_bus;
     ISABus *isa_bus;
     PCII440FXState *i440fx_state;
-    int piix3_devfn = -1;
+    int piix3_devfn = -1;//南桥
     qemu_irq *i8259;
     qemu_irq smi_irq;
     GSIState *gsi_state;
@@ -189,7 +189,7 @@ static void pc_init1(MachineState *machine,
     /* allocate ram and load rom/bios */
     if (!xen_enabled()) { //走这里
 
-	    //内存初始化，这些host的虚拟内存会作为guest os的物理内存用
+	    //内存初始化，这些host的虚拟内存会作为guest os的物理内存用,加载linux内核文件
         pc_memory_init(pcms, system_memory,
                        rom_memory, &ram_memory);
     } else if (machine->kernel_filename != NULL) {
@@ -199,8 +199,10 @@ static void pc_init1(MachineState *machine,
 
 	//下面是给PC进行中断初始化
     gsi_state = g_malloc0(sizeof(*gsi_state));
-    if (kvm_ioapic_in_kernel()) { //走这里
+    if (kvm_ioapic_in_kernel()) { //内核模拟中断控制器
+        //在qemu层配置中断路由信息,并且提交到KVM
         kvm_pc_setup_irq_routing(pcmc->pci_enabled);
+		//给GSIState设置qemu_irq
         pcms->gsi = qemu_allocate_irqs(kvm_pc_gsi_handler, gsi_state,
                                        GSI_NUM_PINS);
     } else {
@@ -224,13 +226,14 @@ static void pc_init1(MachineState *machine,
                               &error_abort);
         no_hpet = 1;
     }
+	//isa_bus->irqs= gcms->gsi
     isa_bus_irqs(isa_bus, pcms->gsi);
 
-    if (kvm_pic_in_kernel()) {
+    if (kvm_pic_in_kernel()) {//pic在内核kvm中模拟
         i8259 = kvm_i8259_init(isa_bus);
     } else if (xen_enabled()) {
         i8259 = xen_interrupt_controller_init();
-    } else {
+    } else {//pic在qemu中模拟
         i8259 = i8259_init(isa_bus, pc_allocate_cpu_irq());
     }
 
@@ -238,6 +241,7 @@ static void pc_init1(MachineState *machine,
         gsi_state->i8259_irq[i] = i8259[i];
     }
     g_free(i8259);
+	
     if (pcmc->pci_enabled) { //初始化ioapic
         ioapic_init_gsi(gsi_state, "i440fx");
     }
@@ -251,7 +255,8 @@ static void pc_init1(MachineState *machine,
         pcms->vmport = xen_enabled() ? ON_OFF_AUTO_OFF : ON_OFF_AUTO_ON;
     }
 
-    /* init basic PC hardware 
+    /*
+     * init basic PC hardware 
 	 */
     pc_basic_device_init(isa_bus, pcms->gsi, &rtc_state, true,
                          (pcms->vmport != ON_OFF_AUTO_ON), 0x4);

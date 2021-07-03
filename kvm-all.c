@@ -142,7 +142,7 @@ bool kvm_gsi_direct_mapping;
 bool kvm_allowed;
 bool kvm_readonly_mem_allowed;
 bool kvm_vm_attributes_allowed;
-bool kvm_direct_msi_allowed;
+bool kvm_direct_msi_allowed; //==1
 bool kvm_ioeventfd_any_length_allowed;
 bool kvm_msi_use_devid;
 
@@ -276,6 +276,7 @@ static int kvm_set_user_memory_region(KVMMemoryListener *kml, KVMSlot *slot)
     mem.userspace_addr = (unsigned long)slot->ram;
     mem.flags = slot->flags;
 
+    //如果是readonly的,就设置size=0
     if (slot->memory_size && mem.flags & KVM_MEM_READONLY) {
         /* Set the slot size to 0 before setting the slot to the desired
          * value. This is needed based on KVM commit 75d61fbc. */
@@ -561,6 +562,7 @@ static void kvm_coalesce_mmio_region(MemoryListener *listener,
         zone.size = size;
         zone.pad = 0;
 
+        //合并mmio操作，kvm在内核中会保存mmio操作，一直等到最后一个mmio了，才返回给qemu中的虚拟设备进行处理
         (void)kvm_vm_ioctl(s, KVM_REGISTER_COALESCED_MMIO, &zone);
     }
 }
@@ -750,6 +752,8 @@ kvm_check_extension_list(KVMState *s, const KVMCapabilityInfo *list)
  *
  * kvm_region_del()
  *  kvm_set_phys_mem(add=false)
+ *
+ * 通过MemoryListener调用过来
  */
 static void kvm_set_phys_mem(KVMMemoryListener *kml,
                              MemoryRegionSection *section, bool add)
@@ -927,6 +931,13 @@ static void kvm_set_phys_mem(KVMMemoryListener *kml,
  * 	   memory_listener_register()
  * 	    listener_add_address_space()
  *       kvm_region_add()
+ * 
+ * memory_region_transaction_commit()
+ *  address_space_update_topology()
+ *   address_space_update_topology_pass()
+ *    kvm_region_add()
+ *
+ * 通过MemoryListener调用过来
  */
 static void kvm_region_add(MemoryListener *listener,
                            MemoryRegionSection *section)
@@ -1314,12 +1325,17 @@ static KVMMSIRoute *kvm_lookup_msi_route(KVMState *s, MSIMessage msg)
     return NULL;
 }
 
+/*
+ * kvm_apic_mem_write()
+ *  kvm_send_msi()
+ *   kvm_irqchip_send_msi()
+ */
 int kvm_irqchip_send_msi(KVMState *s, MSIMessage msg)
 {
     struct kvm_msi msi;
     KVMMSIRoute *route;
 
-    if (kvm_direct_msi_allowed) {
+    if (kvm_direct_msi_allowed) { //走这里
         msi.address_lo = (uint32_t)msg.address;
         msi.address_hi = msg.address >> 32;
         msi.data = le32_to_cpu(msg.data);
@@ -1355,6 +1371,7 @@ int kvm_irqchip_send_msi(KVMState *s, MSIMessage msg)
 
     assert(route->kroute.type == KVM_IRQ_ROUTING_MSI);
 
+    //走到kvm层去
     return kvm_set_irq(s, route->kroute.gsi, 1);
 }
 
@@ -1930,6 +1947,7 @@ static int kvm_init(MachineState *ms)
         s->memory_listener.listener.eventfd_add = kvm_mem_ioeventfd_add;
         s->memory_listener.listener.eventfd_del = kvm_mem_ioeventfd_del;
     }
+	
     s->memory_listener.listener.coalesced_mmio_add = kvm_coalesce_mmio_region;
     s->memory_listener.listener.coalesced_mmio_del = kvm_uncoalesce_mmio_region;
 
