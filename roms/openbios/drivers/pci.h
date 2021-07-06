@@ -1,6 +1,9 @@
 #ifndef PCI_H
 #define PCI_H
 
+/*
+ * PCI设备的配置空间中的偏移
+ */
 #define PCI_VENDOR_ID		0x00
 #define PCI_DEVICE_ID		0x02
 
@@ -58,6 +61,8 @@
 #define PCI_INTERRUPT_PIN       0x3d    /* 8 bits */
 #define PCI_MIN_GNT             0x3e    /* 8 bits */
 #define PCI_MAX_LAT             0x3f    /* 8 bits */
+/* 到此位置，PCI 配置空间的前64字节为所有设备的通用格式 */
+
 
 #define PCI_RANGE_RELOCATABLE          0x80000000
 #define PCI_RANGE_PREFETCHABLE         0x40000000

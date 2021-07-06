@@ -372,6 +372,7 @@ void qdev_init_nofail(DeviceState *dev)
     assert(!dev->realized);
 
     object_ref(OBJECT(dev));
+	//这里会调用到pci_e1000_realize
     object_property_set_bool(OBJECT(dev), true, "realized", &err);
     if (err) {
         error_reportf_err(err, "Initialization of device %s failed: ",

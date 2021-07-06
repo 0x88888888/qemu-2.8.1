@@ -44,9 +44,10 @@ do { printf("pci_host_data: " fmt , ## __VA_ARGS__); } while (0)
 /* the helper function to get a PCIDevice* for a given pci address */
 static inline PCIDevice *pci_dev_find_by_addr(PCIBus *bus, uint32_t addr)
 {
-    uint8_t bus_num = addr >> 16;
-    uint8_t devfn = addr >> 8;
+    uint8_t bus_num = addr >> 16; //总线号
+    uint8_t devfn = addr >> 8; //设备号
 
+    //在pci.c中
     return pci_find_device(bus, bus_num, devfn);
 }
 
@@ -63,6 +64,7 @@ void pci_host_config_write_common(PCIDevice *pci_dev, uint32_t addr,
 
     trace_pci_cfg_write(pci_dev->name, PCI_SLOT(pci_dev->devfn),
                         PCI_FUNC(pci_dev->devfn), addr, val);
+	//pci_default_write_config
     pci_dev->config_write(pci_dev, addr, val, MIN(len, limit - addr));
 }
 
@@ -130,6 +132,7 @@ static void pci_host_config_write(void *opaque, hwaddr addr,
     if (addr != 0 || len != 4) {
         return;
     }
+	//将虚拟机选择的设备地址保存在了config_reg寄存器中
     s->config_reg = val;
 }
 

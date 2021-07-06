@@ -574,8 +574,14 @@ void qdev_set_id(DeviceState *dev, const char *id)
  *   qmp_device_add()
  *    qdev_device_add()
  *
+ * main() [vl.c]
+ *  ...
+ *   device_init_func() 
+ *    qdev_device_add()
+ *
+ *
  * qdev_create创建设备,在随主板初始化的时候一起创建，如南北桥，一些传统的ISA设备、默认的显卡设备等
- * qdev_device_add创建设备，在QEMU monitor中通过device_add添加的设备
+ * qdev_device_add创建设备，在QEMU monitor中通过device_add添加的设备,或者通过-device参数创建设备，也是调用这个函数
  *   
  */
 DeviceState *qdev_device_add(QemuOpts *opts, Error **errp)
@@ -612,6 +618,7 @@ DeviceState *qdev_device_add(QemuOpts *opts, Error **errp)
             return NULL;
         }
     } else if (dc->bus_type != NULL) {
+       //查找设备所需要挂载的总线
         bus = qbus_find_recursive(sysbus_get_default(), NULL, dc->bus_type);
         if (!bus || qbus_is_full(bus)) {
             error_setg(errp, "No '%s' bus found for device '%s'",
@@ -628,7 +635,7 @@ DeviceState *qdev_device_add(QemuOpts *opts, Error **errp)
 	//创建device
     dev = DEVICE(object_new(driver));
 
-    if (bus) {
+    if (bus) {//父子关系
         qdev_set_parent_bus(dev, bus);
     }
 
@@ -643,7 +650,7 @@ DeviceState *qdev_device_add(QemuOpts *opts, Error **errp)
     }
 
     dev->opts = opts;
-	//设备已经初始化完毕，可以使用了
+	//设备已经初始化完毕，可以使用了,调用相应的realize函数
     object_property_set_bool(OBJECT(dev), true, "realized", &err);
     if (err != NULL) {
         error_propagate(errp, err);

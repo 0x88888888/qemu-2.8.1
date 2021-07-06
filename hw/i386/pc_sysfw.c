@@ -36,6 +36,9 @@
 #include "hw/block/flash.h"
 #include "sysemu/kvm.h"
 
+/*
+ * bios文件,这个文件会会被加载到VM中去运行，准备一些基本环境
+ */
 #define BIOS_FILENAME "bios.bin"
 
 typedef struct PcSysFwDevice {
@@ -217,7 +220,20 @@ static void old_pc_system_rom_init(MemoryRegion *rom_memory, bool isapc_ram_fw)
     if (!isapc_ram_fw) {
         memory_region_set_readonly(bios, true);
     }
-	//读取bios文件内容进来,添加到roms
+	/*
+	 * 读取bios文件内容进来,添加到roms链表
+	 *
+	 * uint32_t)(-bios_size) 是一个 32 位无符号数字，
+	 * 所以-bios_size 对应的地址就是 FFFFFFFF 减掉 bios_size 的大小。 
+	 * bios size 大小为 ./pc-bios/bios.bin = 131072 （128KB）字节，十六进制表示为 0x20000，
+	 * 所以 bios 在内存中的位置为 bios position = fffe0000，
+	 * bios 在内存中的位置就是 0xfffdffff~0xffffffff 现在 BIOS 已经加在到虚拟机的物理内存地址空间中了
+	 *
+	 *
+	 * 下面这段说明在 x86_cpu_reset()中完成
+	 * QEMU 调用 CPU 重置函数重置 VCPU 的寄存器值 IP=0x0000fff0, CS=0xf000, CS.BASE= 0xffff0000,CS.LIMIT=0xffff. 
+	 * 指令从 0xfffffff0 开始执行，正好是 ROM 程序的开始位置。虚拟机就找到了 BIOS 的入口。
+	 */
     ret = rom_add_file_fixed(bios_name, (uint32_t)(-bios_size), -1);
     if (ret != 0) {
     bios_error:

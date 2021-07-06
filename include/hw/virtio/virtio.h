@@ -99,6 +99,7 @@ struct VirtIODevice
     VirtQueue *vq;
     uint16_t device_id;
     bool vm_running;
+	//guest os中对应virtio device的状态不能为broken
     bool broken; /* device in invalid state, needs reset */
     VMChangeStateEntry *vmstate;
     char *bus_name;

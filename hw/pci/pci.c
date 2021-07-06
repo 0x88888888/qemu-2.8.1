@@ -722,6 +722,11 @@ static PCIBus *pci_get_bus_devfn(int *devfnp, PCIBus *root,
     return pci_find_bus_nr(root, bus);
 }
 
+/*
+ * pci_qdev_realize()
+ *  do_pci_register_device()
+ *   pci_init_cmask()
+ */
 static void pci_init_cmask(PCIDevice *dev)
 {
     pci_set_word(dev->cmask + PCI_VENDOR_ID, 0xffff);
@@ -734,6 +739,12 @@ static void pci_init_cmask(PCIDevice *dev)
     dev->cmask[PCI_CAPABILITY_LIST] = 0xff;
 }
 
+/*
+ * pci_qdev_realize()
+ *  do_pci_register_device()
+ *   pci_init_wmask()
+ *
+ */
 static void pci_init_wmask(PCIDevice *dev)
 {
     int config_size = pci_config_size(dev);
@@ -751,6 +762,12 @@ static void pci_init_wmask(PCIDevice *dev)
            config_size - PCI_CONFIG_HEADER_SIZE);
 }
 
+/*
+ * pci_qdev_realize()
+ *  do_pci_register_device()
+ *   pci_init_wmask()
+ *    pci_init_w1cmask()
+ */
 static void pci_init_w1cmask(PCIDevice *dev)
 {
     /*
@@ -876,6 +893,7 @@ static void pci_init_multifunction(PCIBus *bus, PCIDevice *dev, Error **errp)
  */
 static void pci_config_alloc(PCIDevice *pci_dev)
 {
+    //都是4K
     int config_size = pci_config_size(pci_dev);
 
     pci_dev->config = g_malloc0(config_size);
@@ -990,6 +1008,10 @@ uint16_t pci_requester_id(PCIDevice *dev)
  *          pci_qdev_realize()
  *           do_pci_register_device()
  *
+ * virtio_pci_dc_realize()
+ *  pci_qdev_realize()
+ *   do_pci_register_device()
+ *
  * -1 for devfn means auto assign 
  *
  */
@@ -1043,20 +1065,23 @@ static PCIDevice *do_pci_register_device(PCIDevice *pci_dev, PCIBus *bus,
     pci_dev->requester_id_cache = pci_req_id_cache_get(pci_dev);
 
     if (qdev_hotplug) {
+		/*
+		 * 设置 pci_dev->bus_master_as, pci_dev->bus_master_enable_region
+		 */
         pci_init_bus_master(pci_dev);
     }
     pstrcpy(pci_dev->name, sizeof(pci_dev->name), name);
     pci_dev->irq_state = 0;
-	//分配pci设备的配置空间
+	//分配pci设备的配置空间pci_dev->config
     pci_config_alloc(pci_dev);
 
-    //设置配置空间的一些值
+    //设置配置空间pci_dev->config[]中的一些值
     pci_config_set_vendor_id(pci_dev->config, pc->vendor_id);
     pci_config_set_device_id(pci_dev->config, pc->device_id);
     pci_config_set_revision(pci_dev->config, pc->revision);
     pci_config_set_class(pci_dev->config, pc->class_id);
 
-    if (!pc->is_bridge) {//桥设备
+    if (!pc->is_bridge) {//非桥设备
         if (pc->subsystem_vendor_id || pc->subsystem_id) {
             pci_set_word(pci_dev->config + PCI_SUBSYSTEM_VENDOR_ID,
                          pc->subsystem_vendor_id);
@@ -1070,9 +1095,12 @@ static PCIDevice *do_pci_register_device(PCIDevice *pci_dev, PCIBus *bus,
         assert(!pc->subsystem_vendor_id);
         assert(!pc->subsystem_id);
     }
-	
+
+	//设置PCIDevice->cmask
     pci_init_cmask(pci_dev);
+	//设置PCIDevice->wmask
     pci_init_wmask(pci_dev);
+	//设置PCIDevice->w1cmask
     pci_init_w1cmask(pci_dev);
     if (pc->is_bridge) {
         pci_init_mask_bridge(pci_dev);
@@ -1130,6 +1158,9 @@ static void pci_qdev_unrealize(DeviceState *dev, Error **errp)
 /*
  * e1000e_pci_realize()
  *  pci_register_bar()
+ *
+ * type可以为  PCI_BASE_ADDRESS_SPACE_IO， PCI_BASE_ADDRESS_SPACE_MEMORY
+ *             PCI_BASE_ADDRESS_MEM_PREFETCH,PCI_BASE_ADDRESS_MEM_TYPE_64 ....
  */
 void pci_register_bar(PCIDevice *pci_dev, int region_num /* base address register 的索引 */,
                       uint8_t type, MemoryRegion *memory /*mmio这个region*/)
@@ -1394,11 +1425,12 @@ void pci_default_write_config(PCIDevice *d, uint32_t addr, uint32_t val_in, int 
         d->config[addr + i] = (d->config[addr + i] & ~wmask) | (val & wmask);
         d->config[addr + i] &= ~(val & w1cmask); /* W1C: Write 1 to Clear */
     }
+	//写入pci设备的base address register空间了
     if (ranges_overlap(addr, l, PCI_BASE_ADDRESS_0, 24) ||
         ranges_overlap(addr, l, PCI_ROM_ADDRESS, 4) ||
         ranges_overlap(addr, l, PCI_ROM_ADDRESS1, 4) ||
         range_covers_byte(addr, l, PCI_COMMAND))
-        pci_update_mappings(d);//pci bar 表示的mmio布局，可能会影响guest os在kvm中的内存信息
+        pci_update_mappings(d);//建立设备bar空间的MemoryRegion,pci bar 表示的mmio布局，可能会影响guest os在kvm中的内存信息
 
     if (range_covers_byte(addr, l, PCI_COMMAND)) {
         pci_update_irq_disabled(d, was_irq_disabled);
@@ -1954,6 +1986,11 @@ static bool pci_root_bus_in_range(PCIBus *bus, int bus_num)
     return false;
 }
 
+/*
+ * pci_dev_find_by_addr()
+ *  pci_find_device()
+ *   pci_find_bus_nr()
+ */
 static PCIBus *pci_find_bus_nr(PCIBus *bus, int bus_num)
 {
     PCIBus *sec;
@@ -1984,6 +2021,7 @@ static PCIBus *pci_find_bus_nr(PCIBus *bus, int bus_num)
                     break;
                 }
             } else {
+            //找到
                 if (pci_secondary_bus_in_range(sec->parent_dev, bus_num)) {
                     break;
                 }
@@ -2021,14 +2059,19 @@ void pci_for_each_bus_depth_first(PCIBus *bus,
     }
 }
 
-
+/*
+ * pci_dev_find_by_addr()
+ *  pci_find_device()
+ */
 PCIDevice *pci_find_device(PCIBus *bus, int bus_num, uint8_t devfn)
 {
+    //根据总线号,得到bus对象
     bus = pci_find_bus_nr(bus, bus_num);
 
     if (!bus)
         return NULL;
 
+    //从总线上得到对应的devfn设备
     return bus->devices[devfn];
 }
 
@@ -2043,6 +2086,11 @@ PCIDevice *pci_find_device(PCIBus *bus, int bus_num, uint8_t devfn)
  *        object_property_set_bool(OBJECT(dev), true, "realized", &err)
  *         ....
  *          pci_qdev_realize()
+ *
+ * virtio_pci_dc_realize()
+ *  pci_qdev_realize()
+ *
+ * 这个函数作为PCIDevice->qdev 的realize函数
  */
 static void pci_qdev_realize(DeviceState *qdev, Error **errp)
 {
@@ -2057,6 +2105,7 @@ static void pci_qdev_realize(DeviceState *qdev, Error **errp)
         pci_dev->cap_present |= QEMU_PCI_CAP_EXPRESS;
     }
 
+    //得到device所在bus
     bus = PCI_BUS(qdev_get_parent_bus(qdev));
 
 	//1.分配pci设备的配置空间等等...
@@ -2066,7 +2115,7 @@ static void pci_qdev_realize(DeviceState *qdev, Error **errp)
     if (pci_dev == NULL)
         return;
 
-    //2.调用xxx_realize
+    //2.父类DeviceState->realize调用子类PCIDeviceClass->realize
     if (pc->realize) {//pc_default_realize,virtio_pci_realize,pci_e1000_realize
         pc->realize(pci_dev, &local_err);
         if (local_err) {

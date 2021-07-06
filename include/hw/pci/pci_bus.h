@@ -22,6 +22,7 @@ struct PCIBus {
     BusState qbus;
     PCIIOMMUFunc iommu_fn;
     void *iommu_opaque;
+	//PCI的插槽号
     uint8_t devfn_min;
 	/*
 	 * piix3_set_irq

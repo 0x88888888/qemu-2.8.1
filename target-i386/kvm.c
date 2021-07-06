@@ -1352,7 +1352,7 @@ static int kvm_getput_regs(X86CPU *cpu, int set)
     kvm_getput_reg(&regs.rflags, &env->eflags, set);
     kvm_getput_reg(&regs.rip, &env->eip, set);
 
-    if (set) {
+    if (set) {//设置vCPU的寄存器,通常是在vCPU启动之前来搞
         ret = kvm_vcpu_ioctl(CPU(cpu), KVM_SET_REGS, &regs);
     }
 
@@ -1508,6 +1508,7 @@ static int kvm_put_sregs(X86CPU *cpu)
                 (uint64_t)1 << (env->interrupt_injected % 64);
     }
 
+    //env->segs[]在x86_cpu_reset中设置
     if ((env->eflags & VM_MASK)) {
         set_v8086_seg(&sregs.cs, &env->segs[R_CS]);
         set_v8086_seg(&sregs.ds, &env->segs[R_DS]);
@@ -1544,6 +1545,7 @@ static int kvm_put_sregs(X86CPU *cpu)
 
     sregs.efer = env->efer;
 
+    //到KVM中设置vmcs的段寄存器
     return kvm_vcpu_ioctl(CPU(cpu), KVM_SET_SREGS, &sregs);
 }
 
@@ -2648,6 +2650,12 @@ static int kvm_get_debugregs(X86CPU *cpu)
     return 0;
 }
 
+/*
+ * kvm_cpu_exec()
+ *  kvm_arch_put_registers()
+ *
+ * 同步cpu的信息到kvm中对应的vCPU的vmcs中去
+ */
 int kvm_arch_put_registers(CPUState *cpu, int level)
 {
     X86CPU *x86_cpu = X86_CPU(cpu);

@@ -141,15 +141,38 @@ struct VirtIOPCIProxy {
 	//包含虚拟PCI设备信息
     PCIDevice pci_dev;
     MemoryRegion bar;
+	/*
+	 * 这几个MemoryRegion都要和VM中的物理地址空间关联起来,
+	 * VM读写这些物理地址的时候产生VM Exit,跳出VM来，
+	 * 有qemu中的virtio设备来处理数据
+	 *
+	 * 这些MemoryRegion在virtio_pci_device_plugged中map到vm的物理地中空间中去
+	 */
+	/* 
+	 * virtio_pci_modern_regions_init中设置common这段设备的地址空间的操作函数common_ops
+	 */
     VirtIOPCIRegion common;
+	/* 
+	 * virtio_pci_modern_regions_init中设置isr这段设备的地址空间的操作函数isr_ops
+	 */	
     VirtIOPCIRegion isr;
+	/* 
+	 * virtio_pci_modern_regions_init中设置device这段设备的地址空间的操作函数device_ops
+	 */	
     VirtIOPCIRegion device;
+	/* 
+	 * virtio_pci_modern_regions_init中设置notify这段设备的地址空间的操作函数notify_ops
+	 */	
     VirtIOPCIRegion notify;
+	/* 
+	 * virtio_pci_modern_regions_init中设置notify_pio这段设备的地址空间的操作函数common_ops
+	 */	
     VirtIOPCIRegion notify_pio;
 	//IO内存基地址结构
     MemoryRegion modern_bar;
     MemoryRegion io_bar;
     MemoryRegion modern_cfg;
+	
     AddressSpace modern_as;
 	
     uint32_t legacy_io_bar_idx;

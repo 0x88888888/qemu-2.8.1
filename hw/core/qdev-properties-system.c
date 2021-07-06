@@ -426,6 +426,11 @@ void qdev_prop_set_netdev(DeviceState *dev, const char *name,
                             value ? value->name : "", name, &error_abort);
 }
 
+/*
+ * pc_nic_init()			
+ *  pci_nic_init_nofail(default_model="e1000", default_devaddr=NULL) 循环调用这个函数
+ *   qdev_set_nic_properties()
+ */
 void qdev_set_nic_properties(DeviceState *dev, NICInfo *nd)
 {
     qdev_prop_set_macaddr(dev, "mac", nd->macaddr.a);

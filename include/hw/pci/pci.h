@@ -267,22 +267,32 @@ typedef struct PCIReqIDCache PCIReqIDCache;
 struct PCIDevice {
     DeviceState qdev;
 
-    /* PCI config space */
+    /* PCI config space
+     * pci设备的配置空间,在pci_config_alloc中分配,4K大小
+     *
+     * 很多函数都是操作这段内存
+     */
     uint8_t *config;
 
     /* Used to enable config checks on load. Note that writable bits are
      * never checked even if set in cmask. 
      * 用来检查相关capability
+     * 在pci_config_alloc中分配,4K大小
+     * 在pci_init_wmask()中初始化
      */
     uint8_t *cmask;
 
     /* Used to implement R/W bytes 
      *用来控制读写
+     * 在pci_config_alloc中分配,4K大小
+     * 在pci_init_wmask()中初始化
 	 */
     uint8_t *wmask;
 
     /* Used to implement RW1C(Write 1 to Clear) bytes 
      *用来实现RW1C
+     * 在pci_config_alloc中分配,4K大小
+     * 在pci_init_w1cmask()中初始化
 	 */
     uint8_t *w1cmask;
 
@@ -291,6 +301,7 @@ struct PCIDevice {
 
     /* the following fields are read only */
     PCIBus *bus;
+	//pci设备的插槽号,-device 选项中的addr参数
     int32_t devfn;
     /* Cached device to fetch requester ID from, to avoid the PCI
      * tree walking every time we invoke PCI request (e.g.,
@@ -299,15 +310,24 @@ struct PCIDevice {
     PCIReqIDCache requester_id_cache;
     char name[64];
     PCIIORegion io_regions[PCI_NUM_REGIONS];
+	/*
+	 * 在pci_init_bus_master()中设置
+	 */
     AddressSpace bus_master_as;
     MemoryRegion bus_master_enable_region;
 
     /* do not access the following fields 
      * 默认值为pci_default_read_config
+     *
+     * 读取pci设备的配置空间的函数
 	 */
     PCIConfigReadFunc *config_read;
 	/*
 	 * 默认值为pci_default_write_config
+	 *
+	 * e1000e_write_config
+	 *
+	 * 写入pci配置空间的函数
 	 */
     PCIConfigWriteFunc *config_write;
 

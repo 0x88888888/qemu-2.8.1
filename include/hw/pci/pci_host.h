@@ -38,10 +38,22 @@
 #define PCI_HOST_BRIDGE_GET_CLASS(obj) \
      OBJECT_GET_CLASS(PCIHostBridgeClass, (obj), TYPE_PCI_HOST_BRIDGE)
 
+/*
+ * 北桥的PCI部分
+ */
 struct PCIHostState {
     SysBusDevice busdev;
 
+    //下面两个寄存器要看i440fx_pcihost_realize()中进行的一些配置
+    /*
+     * CONFADDR寄存器,在i440fx_pcihost_initfn()中进行初始化,操作函数为pci_host_conf_le_ops
+     * 选择PCI设备
+     */
     MemoryRegion conf_mem;
+	/*
+	 * CONFDATA寄存器,在i440fx_pcihost()中进行初始化,操作函数为pci_host_data_le_ops
+	 * 当CONFADDR寄存器最高位为1时,对CONFDATA中指定的设备进行配置
+	 */
     MemoryRegion data_mem;
     MemoryRegion mmcfg;
     uint32_t config_reg;

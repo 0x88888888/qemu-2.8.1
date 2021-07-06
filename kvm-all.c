@@ -2125,7 +2125,7 @@ int kvm_cpu_exec(CPUState *cpu)
     do {
         MemTxAttrs attrs;
 
-        if (cpu->kvm_vcpu_dirty) {
+        if (cpu->kvm_vcpu_dirty) { //将CPUState中的寄存器信息同步到kvm中的vCPU对应的vmcs中去
             kvm_arch_put_registers(cpu, KVM_PUT_RUNTIME_STATE);
             cpu->kvm_vcpu_dirty = false;
         }

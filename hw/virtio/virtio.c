@@ -2025,8 +2025,10 @@ void virtio_instance_init_common(Object *proxy_obj, void *data,
     DeviceState *vdev = data;
 
     object_initialize(vdev, vdev_size, vdev_name);
+	//设置virtio proxy设备对应的 virtio设备
     object_property_add_child(proxy_obj, "virtio-backend", OBJECT(vdev), NULL);
     object_unref(OBJECT(vdev));
+	
     qdev_alias_all_properties(vdev, proxy_obj);
 }
 
@@ -2064,7 +2066,7 @@ void virtio_init(VirtIODevice *vdev, const char *name,
     atomic_set(&vdev->isr, 0);
     vdev->queue_sel = 0;
     vdev->config_vector = VIRTIO_NO_VECTOR;
-	//分配VirtQueue,其中包含了vring
+	//分配VirtQueue,其中包含了vring，但是在qemu中没有分配vring对象哦，vring中的vrin_desc这些在vm的virtio驱动分配
     vdev->vq = g_malloc0(sizeof(VirtQueue) * VIRTIO_QUEUE_MAX);
     vdev->vm_running = runstate_is_running();
     vdev->broken = false;

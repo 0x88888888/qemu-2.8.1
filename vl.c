@@ -2398,12 +2398,15 @@ static int device_help_func(void *opaque, QemuOpts *opts, Error **errp)
  *  ...
  *   device_init_func()
  *
+ * 对每一个-device 参数，都会调用device_init_func，创建相应的设备
+ *
  */
 static int device_init_func(void *opaque, QemuOpts *opts, Error **errp)
 {
     Error *err = NULL;
     DeviceState *dev;
 
+    //创建设备去
     dev = qdev_device_add(opts, &err);
     if (!dev) {
         error_report_err(err);
@@ -4751,6 +4754,7 @@ int main(int argc, char **argv, char **envp)
     /* TODO: once all bus devices are qdevified, this should be done
      * when bus is created by qdev.c */
     qemu_register_reset(qbus_reset_all_fn, sysbus_get_default() /* 创建系统总线 */ );
+	
     qemu_run_machine_init_done_notifiers();
 
     if (rom_check_and_register_reset() != 0) {

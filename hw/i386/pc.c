@@ -1528,7 +1528,7 @@ void pc_memory_init(PCMachineState *pcms,
 
     /* Initialize PC system firmware 
      *
-     * 加载BIOS
+     * 加载bios.bin
 	 */
     pc_system_firmware_init(rom_memory, !pcmc->pci_enabled);
 
@@ -1566,6 +1566,7 @@ void pc_memory_init(PCMachineState *pcms,
     }
 
     for (i = 0; i < nb_option_roms; i++) {
+		//加载固件"kvmvapic.bin",
         rom_add_option(option_rom[i].name, option_rom[i].bootindex);
     }
     pcms->fw_cfg = fw_cfg;

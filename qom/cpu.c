@@ -239,11 +239,16 @@ void cpu_dump_statistics(CPUState *cpu, FILE *f, fprintf_function cpu_fprintf,
     }
 }
 
+/*
+ * x86_cpu_realizefn()
+ *  cpu_reset()
+ */
 void cpu_reset(CPUState *cpu)
 {
     CPUClass *klass = CPU_GET_CLASS(cpu);
 
     if (klass->reset != NULL) {
+		//x86_cpu_reset
         (*klass->reset)(cpu);
     }
 

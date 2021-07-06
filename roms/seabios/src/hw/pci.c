@@ -17,6 +17,7 @@
 
 void pci_config_writel(u16 bdf, u32 addr, u32 val)
 {
+    //outl在 x86.h中
     outl(0x80000000 | (bdf << 8) | (addr & 0xfc), PORT_PCI_CMD);
     outl(val, PORT_PCI_DATA);
 }

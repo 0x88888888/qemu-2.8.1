@@ -209,7 +209,7 @@ struct NICInfo {
     char *name;
     char *devaddr;
 
-	//后端网卡设备
+	//代表后端网卡tap设备
     NetClientState *netdev;
     int used;         /* is this slot in nd_table[] being used? */
     int instantiated; /* does this NICInfo correspond to an instantiated NIC? */

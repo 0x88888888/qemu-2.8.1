@@ -1701,8 +1701,12 @@ static void virtio_pci_device_plugged(DeviceState *d, Error **errp)
 
         struct virtio_pci_cfg_cap *cfg_mask;
 
+        /*
+         * 设置VirtIOPCIProxy->common,VirtIOPCIProxy->isr之类的操作函数
+         */
         virtio_pci_modern_regions_init(proxy);
 
+        //下面将各种MemoryRegion 映射到VM物理地址空间中去
         virtio_pci_modern_mem_region_map(proxy, &proxy->common, &cap);
         virtio_pci_modern_mem_region_map(proxy, &proxy->isr, &cap);
         virtio_pci_modern_mem_region_map(proxy, &proxy->device, &cap);
@@ -1719,6 +1723,7 @@ static void virtio_pci_device_plugged(DeviceState *d, Error **errp)
                                             &notify_pio.cap);
         }
 
+        //设置VirtIOPCIProxy->pci_dev->io_regions[proxy->modern_mem_bar_idx]
         pci_register_bar(&proxy->pci_dev, proxy->modern_mem_bar_idx,
                          PCI_BASE_ADDRESS_SPACE_MEMORY |
                          PCI_BASE_ADDRESS_MEM_PREFETCH |
@@ -1886,8 +1891,11 @@ static void virtio_pci_realize(PCIDevice *pci_dev, Error **errp)
         pci_dev->cap_present &= ~QEMU_PCI_CAP_EXPRESS;
     }
 
-     //在virio pci proxy设备下面创建virtio 总线
-     virtio_pci_bus_new(&proxy->bus, sizeof(proxy->bus), proxy);
+    //在virio pci proxy设备下面创建virtio 总线
+    virtio_pci_bus_new(&proxy->bus, sizeof(proxy->bus), proxy);
+	/*
+	 * 父类PCIDevice->realize调用子类VirtioPCIClass->realize
+	 */
     if (k->realize) { //virtio_balloon_pci_realize
         k->realize(proxy, errp);
     }
@@ -2232,8 +2240,7 @@ static Property virtio_balloon_pci_properties[] = {
  *     ....
  *      device_set_realized()
  *       virtio_pci_dc_realize()
- *        ...
- *         virtio_device_realize()
+ *         pci_qdev_realize()
  *          virtio_balloon_pci_realize()
  */ 
 static void virtio_balloon_pci_realize(VirtIOPCIProxy *vpci_dev, Error **errp)
@@ -2248,6 +2255,7 @@ static void virtio_balloon_pci_realize(VirtIOPCIProxy *vpci_dev, Error **errp)
 
     //将vdev挂载到vpci_dev->bus上去
     qdev_set_parent_bus(vdev, BUS(&vpci_dev->bus));
+	//	virtio_device_realize
     object_property_set_bool(OBJECT(vdev), true, "realized", errp);
 }
 
@@ -2283,6 +2291,7 @@ static void virtio_balloon_pci_instance_init(Object *obj)
                                 TYPE_VIRTIO_BALLOON);
     object_property_add_alias(obj, "guest-stats", OBJECT(&dev->vdev),
                                   "guest-stats", &error_abort);
+	
     object_property_add_alias(obj, "guest-stats-polling-interval",
                               OBJECT(&dev->vdev),
                               "guest-stats-polling-interval", &error_abort);

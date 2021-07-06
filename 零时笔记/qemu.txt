@@ -1,0 +1,100 @@
+initrd_filename
+initrd_filename
+
+qemu-system-x86_64 -serial stdio  -enable-kvm -nographic -kernel /root/software/linux-3.10.18/arch/x86_64/boot/bzImage -initrd rootfs.img.gz -append "root=/dev/ram console=ttyS0 rdinit=sbin/init noapic"
+
+
+qemu-system-x86_64 -enable-kvm -nographic -kernel /root/software/linux-3.10.18/arch/x86_64/boot/bzImage -initrd rootfs.img.gz  -m 128M -nographic -append "rdinit=init console=ttyS0"
+
+
+pc_init1
+
+
+qemu-system-i386 -enable-kvm -nographic -kernel /root/software/kernel_debug/bzImage2.6.24 -initrd hwinitramfs  -append "console=ttyS0 rdinit=init"
+
+qemu-system-i386 -enable-kvm -nographic -kernel /root/software/linux-3.10.18/arch/x86/boot/bzImage -initrd hwinitramfs -append "console=ttyS0 rdinit=init" 
+
+
+ubuntu14使用qemu调试linux内核
+https://www.cnblogs.com/pingandezhufu/p/4392297.html
+
+
+qemu-system-i386 -enable-kvm -nographic -kernel /root/software/linux-3.18.6/arch/x86/boot/bzImage -initrd rootfs.img -append "console=ttyS0 rdinit=init"
+
+qemu-system-x86_64 -enable-kvm -nographic -kernel arch/x86_64/boot/bzImage -hda linux-0.2.img -append "root=/dev/sda"
+
+qemu-system-x86_64 -S -s -serial mon:stdio -nographic -kernel arch/x86_64/boot/bzImage -initrd ../rootfs/rootfs.img.gz  -append "root=/dev/ram console=ttyS0 rdinit=sbin/init noapic"
+ 
+
+qemu-system-x86_64 -S -s -kernel arch/x86_64/boot/bzImage -initrd ../rootfs/rootfs.img.gz  -append "root=/dev/ram console=ttyS0 " -serial mon:stdio -nographic
+
+qemu-system-x86_64 -S -s -kernel arch/x86_64/boot/bzImage -initrd ../rootfs/rootfs.img.gz  -append "nokaslr root=/dev/ram rdinit=sbin/init console=ttyS0" -serial mon:stdio -nographic
+ 
+这个好用
+qemu-system-x86_64 -s -S -smp 2 -kernel arch/x86_64/boot/bzImage -append "nokaslr console=ttyS0" -serial mon:stdio -nographic
+
+
+gdb客户端启动:
+ gdb vmlinux
+ 
+gdb内部:
+ target remote localhost:1234
+ file vmlinux
+ b start_kernel
+
+编译qemu时的配置选项:
+./configure --enable-kvm --enable-debug --enable-vnc --enable-werror --target-list=x86_64-softmmu,i386-softmmu
+
+./configure --enable-kvm --enable-virtfs --enable-debug --enable-vnc --target-list=x86_64-softmmu,i386-softmmu
+
+
+
+qemu内存模型(3) 内存布局初始化
+https://blog.csdn.net/woai110120130/article/details/101615770
+
+QEMU源码分析系列
+https://blog.csdn.net/u011364612/category_6219019.html
+
+qemu如何实现面向对象模型QOM（代码讲解）
+https://blog.csdn.net/u011364612/article/details/53581411
+
+
+QEMU虚拟机源码分析概论
+https://blog.csdn.net/u011364612/article/details/53470925
+
+虚拟化
+https://blog.csdn.net/wanthelping/category_5682983.html
+
+
+
+gdb qemu-system-x86_64 
+
+set args  "-m 512  -kernel arch/x86/boot/bzImage" 
+
+
+qemu-system-x86_64 -s -S -monitor stdio
+
+telnet 127.0.0.1 2345
+
+
+
+
+qemu-system-x86_64 -m 512\
+-nographic  -kernel arch/x86/boot/bzImage \
+-append "noinintrd console=ttyS0 crashkernel=256M root=/dev/vda rootfstype=ext4 rw loglevel=8" \
+-drive if=none,file=rootfs_debian_x86_64.ext4,id=hd0 \
+-device virtio-blk-pci,drive=hd0 \
+-netdev user,id=mynet\
+-device virtio-net-pci,netdev=mynet\
+--fsdev local,id=kmod_dev,path=./kmodules,security_model=none \
+-device virtio-9p-pci,fsdev=kmod_dev,mount_tag=kmod_mount\
+-device virtio-balloon-pci,id=balloon0\
+
+
+gdb --args qemu-system-x86_64 -m 512 -nographic  -kernel arch/x86/boot/bzImage -append "noinintrd console=ttyS0 crashkernel=256M root=/dev/vda rootfstype=ext4 rw loglevel=8" -drive if=none,file=rootfs_debian_x86_64.ext4,id=hd0 -device virtio-blk-pci,drive=hd0 -netdev user,id=mynet -device virtio-net-pci,netdev=mynet --fsdev local,id=kmod_dev,path=./kmodules,security_model=none -device virtio-9p-pci,fsdev=kmod_dev,mount_tag=kmod_mount -device virtio-balloon-pci,id=balloon0
+
+
+qemu-system-x86_64 -m 512 -nographic  -kernel arch/x86/boot/bzImage -append "noinintrd console=ttyS0 crashkernel=256M root=/dev/vda rootfstype=ext4 rw loglevel=8" -drive if=none,file=rootfs_debian_x86_64.ext4,id=hd0 -device virtio-blk-pci,drive=hd0 -netdev user,id=mynet -device virtio-net-pci,netdev=mynet --fsdev local,id=kmod_dev,path=./kmodules,security_model=none -device virtio-9p-pci,fsdev=kmod_dev,mount_tag=kmod_mount -device virtio-balloon-pci,id=balloon0 -s -S
+
+
+

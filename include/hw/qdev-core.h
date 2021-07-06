@@ -100,7 +100,12 @@ typedef struct DeviceClass {
     /*< public >*/
 
     /*
-     * 设备的种类,DEVICE_CATEGORY_USB,DEVICE_CATEGORY_NETWORK,DEVICE_CATEGORY_NETWORK
+     * 设备的种类,
+     * DEVICE_CATEGORY_USB,
+     * DEVICE_CATEGORY_NETWORK,
+     * DEVICE_CATEGORY_BRIDGE,
+     * DEVICE_CATEGORY_STORAGE,
+     * DEVICE_CATEGORY_DISPLAY....
      */
     DECLARE_BITMAP(categories, DEVICE_CATEGORY_MAX);
 	/*
@@ -143,7 +148,9 @@ typedef struct DeviceClass {
      */
     bool hotpluggable;
 
-    /* callbacks */
+    /* callbacks 
+     * 重置设备的状态
+	 */
     void (*reset)(DeviceState *dev);
 	/*
 	 * 通常是device_realize
@@ -151,6 +158,8 @@ typedef struct DeviceClass {
 	 * VirtioPCIClass在virtio_pci_class_init中设置这个realize=virtio_pci_realize
 	 *
 	 * DeviceClass子类有其自己的realize成员，比如VirtioDeviceClass->realize
+	 *
+	 * VirtioPCIClass时, pci_qdev_realize
 	 */
     DeviceRealize realize;
     DeviceUnrealize unrealize;
@@ -184,6 +193,8 @@ struct NamedGPIOList {
  *
  * This structure should not be accessed directly.  We declare it here
  * so that it can be embedded in individual device state structures.
+ *
+ *
  */
 struct DeviceState {
     /*< private >*/

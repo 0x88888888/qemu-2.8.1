@@ -2825,7 +2825,13 @@ void cpu_x86_cpuid(CPUX86State *env, uint32_t index /* 主功能号 */, uint32_t
     }
 }
 
-/* CPUClass::reset() */
+/*
+ * x86_cpu_realizefn()
+ *  cpu_reset()
+ *   x86_cpu_reset()
+ *
+ * CPUClass::reset() 
+ */
 static void x86_cpu_reset(CPUState *s)
 {
     X86CPU *cpu = X86_CPU(s);
@@ -3402,7 +3408,7 @@ static void x86_cpu_realizefn(DeviceState *dev, Error **errp)
     }
 #endif
 
-    //建立n个vCPU
+    //kvm中创建vCPU
     qemu_init_vcpu(cs);
 
     /* Only Intel CPUs support hyperthreading. Even though QEMU fixes this
@@ -3423,6 +3429,7 @@ static void x86_cpu_realizefn(DeviceState *dev, Error **errp)
     if (local_err != NULL) {
         goto out;
     }
+	//重置cpu的状态,qemu跳到vCPU执行的时候，就是开始执行bios的代码了
     cpu_reset(cs);
 
     xcc->parent_realize(dev, &local_err);

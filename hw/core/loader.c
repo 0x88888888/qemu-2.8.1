@@ -814,6 +814,11 @@ struct Rom {
 };
 
 static FWCfgState *fw_cfg;
+/*
+ * 所有的固件链表 ,"bios.bin","isa-bios" "bios-256k.bin"
+ *                 "etc/acpi/tables", "etc/table-loader"
+ *                 "etc/acpi/rsdp"
+ */
 static QTAILQ_HEAD(, Rom) roms = QTAILQ_HEAD_INITIALIZER(roms);
 
 static inline bool rom_order_compare(Rom *rom, Rom *item)
