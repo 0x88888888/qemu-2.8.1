@@ -197,6 +197,11 @@ void virtio_bus_release_ioeventfd(VirtioBusState *bus)
     }
 }
 
+/*
+ * virtio_pci_start_ioeventfd()
+ *  virtio_pci_start_ioeventfd()
+ *   virtio_bus_start_ioeventfd()
+ */
 int virtio_bus_start_ioeventfd(VirtioBusState *bus)
 {
     VirtioBusClass *k = VIRTIO_BUS_GET_CLASS(bus);
@@ -274,6 +279,7 @@ int virtio_bus_set_host_notifier(VirtioBusState *bus, int n, bool assign)
                          __func__, strerror(-r), r);
             return r;
         }
+		//virtio_mmio_ioeventfd_assign
         r = k->ioeventfd_assign(proxy, notifier, n, true);
         if (r < 0) {
             error_report("%s: unable to assign ioeventfd: %d", __func__, r);

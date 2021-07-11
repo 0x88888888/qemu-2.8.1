@@ -37,13 +37,22 @@ typedef enum {
 } CoroutineAction;
 
 struct Coroutine {
+	//任务函数指针
     CoroutineEntry *entry;
+	//任务参数
     void *entry_arg;
+	//协程调用者，当协程让出时，主动跳转到调用者发起调用时保存的上下文
     Coroutine *caller;
+	//协程通过这个成员将自己加入到pending等待队列中
     QSLIST_ENTRY(Coroutine) pool_next;
     size_t locks_held;
 
-    /* Coroutines that should be woken up when we yield or terminate */
+    /*
+     * Coroutines that should be woken up when we yield or terminate 
+     *
+     * 当前协程正在运行时，其余协程也想要执行，通过co_queue_next将自身加入到co_queue_wakeup等待队列中
+     * 当前协程执行完或者主动让出cpu之后，如果co_queue_wakeup等待队列中有成员，就将其取出加到pending队列中，继续运行协程 
+	 */
     QSIMPLEQ_HEAD(, Coroutine) co_queue_wakeup;
     QSIMPLEQ_ENTRY(Coroutine) co_queue_next;
 };

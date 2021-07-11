@@ -951,7 +951,7 @@ int qemu_find_nic_model(NICInfo *nd, const char * const *models,
  *   net_init_client() 处理-net nic参数
  *    net_client_init()
  *     net_client_init1()
- *      net_init_nic()
+ *      net_init_nic(peer==NULL)
  */
 static int net_init_nic(const Netdev *netdev, const char *name,
                         NetClientState *peer, Error **errp)
@@ -1522,6 +1522,7 @@ void qmp_set_link(const char *name, bool up, Error **errp)
     }
 
     if (nc->info->link_status_changed) {
+		//virtio_net_set_link_status
         nc->info->link_status_changed(nc);
     }
 
@@ -1540,6 +1541,7 @@ void qmp_set_link(const char *name, bool up, Error **errp)
             }
         }
         if (nc->peer->info->link_status_changed) {
+			//virtio_net_set_link_status
             nc->peer->info->link_status_changed(nc->peer);
         }
     }

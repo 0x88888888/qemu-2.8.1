@@ -32,16 +32,20 @@
 #endif
 
 typedef struct {
+	//协程
     Coroutine base;
+	//栈空间
     void *stack;
+	//保存栈大小
     size_t stack_size;
+	//保存cpu寄存器
     sigjmp_buf env;
 
 #ifdef CONFIG_VALGRIND_H
     unsigned int valgrind_stack_id;
 #endif
 
-} CoroutineUContext;
+} CoroutineUContext; //协程上下文
 
 /**
  * Per-thread coroutine bookkeeping

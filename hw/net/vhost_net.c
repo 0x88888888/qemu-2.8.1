@@ -178,6 +178,9 @@ struct vhost_net *vhost_net_init(VhostNetOptions *options)
     net->nc = options->net_backend;
 
     net->dev.max_queues = 1;
+	/*
+	 * 一个发送队列和一个接收队列
+	 */
     net->dev.nvqs = 2;
     net->dev.vqs = net->vqs;
 
@@ -208,11 +211,14 @@ struct vhost_net *vhost_net_init(VhostNetOptions *options)
     if (r < 0) {
         goto fail;
     }
+	
     if (backend_kernel) {
+		
         if (!qemu_has_vnet_hdr_len(options->net_backend,
                                sizeof(struct virtio_net_hdr_mrg_rxbuf))) {
             net->dev.features &= ~(1ULL << VIRTIO_NET_F_MRG_RXBUF);
         }
+        
         if (~net->dev.features & net->dev.backend_features) {
             fprintf(stderr, "vhost lacks feature mask %" PRIu64
                    " for backend\n",
@@ -278,10 +284,13 @@ static int vhost_net_start_one(struct vhost_net *net,
         net->nc->info->poll(net->nc, false);
     }
 
+   
     if (net->nc->info->type == NET_CLIENT_DRIVER_TAP) {
         qemu_set_fd_handler(net->backend, NULL, NULL, NULL);
         file.fd = net->backend;
+	
         for (file.index = 0; file.index < net->dev.nvqs; ++file.index) {
+			
             r = vhost_net_set_backend(&net->dev, &file);
             if (r < 0) {
                 r = -errno;
@@ -327,10 +336,11 @@ static void vhost_net_stop_one(struct vhost_net *net,
 }
 
 /*
- * virtio_net_set_link_status()
- *  virtio_net_set_status()
- *   virtio_net_vhost_status()
- *    vhost_net_start()
+ * virtio_pci_common_write()
+ *  virtio_set_status
+ *   virtio_net_set_status()
+ *    virtio_net_vhost_status()
+ *     vhost_net_start()
  *
  * ncs是virtio对应的网络后端tap设备
  */
@@ -356,7 +366,8 @@ int vhost_net_start(VirtIODevice *dev, NetClientState *ncs,
 		//设置vhost_net->dev->vq_index=i*2
         vhost_net_set_vq_index(net, i * 2);
 
-        /* Suppress the masking guest notifiers on vhost user
+        /*
+         * Suppress the masking guest notifiers on vhost user
          * because vhost user doesn't interrupt masking/unmasking
          * properly.
          */

@@ -151,6 +151,10 @@ void del_boot_device_path(DeviceState *dev, const char *suffix)
     }
 }
 
+/*
+ *
+ * 将设备加入fw_boot_order链表
+ */
 void add_boot_device_path(int32_t bootindex, DeviceState *dev,
                           const char *suffix)
 {

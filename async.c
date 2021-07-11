@@ -362,6 +362,7 @@ AioContext *aio_context_new(Error **errp)
     ctx = (AioContext *) g_source_new(&aio_source_funcs, sizeof(AioContext));
     aio_context_setup(ctx);
 
+    //搞一个event fd出来
     ret = event_notifier_init(&ctx->notifier, false);
     if (ret < 0) {
         error_setg_errno(errp, -ret, "Failed to initialize event notifier");

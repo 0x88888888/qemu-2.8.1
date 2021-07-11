@@ -410,6 +410,7 @@ static MemoryRegionSection *address_space_lookup_region(AddressSpaceDispatch *d,
                                  d->map.sections);
         update = true;
     }
+	
     if (resolve_subpage && section->mr->subpage) {
         subpage = container_of(section->mr, subpage_t, iomem);
         section = &d->map.sections[subpage->sub_section[SUBPAGE_IDX(addr)]];

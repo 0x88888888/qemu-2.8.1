@@ -666,8 +666,10 @@ static int kvm_set_ioeventfd_mmio(int fd, hwaddr addr, uint32_t val,
 }
 
 /*
- * kvm_io_ioeventfd_add()
- *  kvm_set_ioeventfd_pio()
+ * virtio_mmio_ioeventfd_assign()
+ *  memory_region_add_eventfd()
+ *   kvm_io_ioeventfd_add()
+ *    kvm_set_ioeventfd_pio()
  */
 static int kvm_set_ioeventfd_pio(int fd, uint16_t addr, uint16_t val,
                                  bool assign, uint32_t size, bool datamatch)
@@ -1004,6 +1006,11 @@ static void kvm_mem_ioeventfd_del(MemoryListener *listener,
     }
 }
 
+/*
+ * virtio_mmio_ioeventfd_assign()
+ *  memory_region_add_eventfd()
+ *   kvm_io_ioeventfd_add()
+ */
 static void kvm_io_ioeventfd_add(MemoryListener *listener,
                                  MemoryRegionSection *section,
                                  bool match_data, uint64_t data,

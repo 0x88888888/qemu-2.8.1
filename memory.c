@@ -166,6 +166,9 @@ struct CoalescedMemoryRange {
     QTAILQ_ENTRY(CoalescedMemoryRange) link;
 };
 
+/*
+ * 内核中对应kvm_ioeventfd
+ */
 struct MemoryRegionIoeventfd {
     AddrRange addr;
     bool match_data;
@@ -223,7 +226,7 @@ struct FlatRange {
     MemoryRegion *mr;
 	//FlatRegion在MemoryRegion中的偏移
     hwaddr offset_in_region;
-	//地址和大小
+	//VM的这段物理地址和大小
     AddrRange addr;
     uint8_t dirty_log_mask;
     bool romd_mode;
@@ -2045,6 +2048,10 @@ void memory_region_clear_global_locking(MemoryRegion *mr)
 
 static bool userspace_eventfd_warning;
 
+/*
+ * virtio_mmio_ioeventfd_assign()
+ *  memory_region_add_eventfd()
+ */
 void memory_region_add_eventfd(MemoryRegion *mr,
                                hwaddr addr,
                                unsigned size,
@@ -2080,10 +2087,13 @@ void memory_region_add_eventfd(MemoryRegion *mr,
     ++mr->ioeventfd_nb;
     mr->ioeventfds = g_realloc(mr->ioeventfds,
                                   sizeof(*mr->ioeventfds) * mr->ioeventfd_nb);
+	//腾出一个存放MemoryRegionIoeventfd的空间
     memmove(&mr->ioeventfds[i+1], &mr->ioeventfds[i],
             sizeof(*mr->ioeventfds) * (mr->ioeventfd_nb-1 - i));
+	//MemoryRegionIoeventfd放进去
     mr->ioeventfds[i] = mrfd;
     ioeventfd_update_pending |= mr->enabled;
+	//修改通知到内核去,kvm_io_ioeventfd_add
     memory_region_transaction_commit();
 }
 

@@ -1116,12 +1116,16 @@ void hmp_nmi(Monitor *mon, const QDict *qdict)
     hmp_handle_error(mon, &err);
 }
 
+/*
+ *
+ * 设置网卡启动
+ */
 void hmp_set_link(Monitor *mon, const QDict *qdict)
 {
     const char *name = qdict_get_str(qdict, "name");
     bool up = qdict_get_bool(qdict, "up");
     Error *err = NULL;
-
+  
     qmp_set_link(name, up, &err);
     hmp_handle_error(mon, &err);
 }

@@ -40,6 +40,11 @@ static int vhost_kernel_call(struct vhost_dev *dev, unsigned long int request,
     return ioctl(fd, request, arg);
 }
 
+/*
+ * vhost_net_init()
+ *  vhost_dev_init(hdev=vhost_net->dev)
+ *   vhost_kernel_init()
+ */
 static int vhost_kernel_init(struct vhost_dev *dev, void *opaque)
 {
     assert(dev->vhost_ops->backend_type == VHOST_BACKEND_TYPE_KERNEL);
@@ -88,6 +93,12 @@ static int vhost_kernel_memslots_limit(struct vhost_dev *dev)
     return limit;
 }
 
+/*
+ * vhost_net_start()
+ *  vhost_net_start_one()
+ *   vhost_net_set_backend()
+ *    vhost_kernel_net_set_backend()
+ */ 
 static int vhost_kernel_net_set_backend(struct vhost_dev *dev,
                                         struct vhost_vring_file *file)
 {
@@ -247,6 +258,10 @@ static int vhost_kernel_get_features(struct vhost_dev *dev,
     return vhost_kernel_call(dev, VHOST_GET_FEATURES, features);
 }
 
+/* 
+ * vhost_net_init()
+ *  vhost_kernel_set_owner()
+ */
 static int vhost_kernel_set_owner(struct vhost_dev *dev)
 {
     return vhost_kernel_call(dev, VHOST_SET_OWNER, NULL);

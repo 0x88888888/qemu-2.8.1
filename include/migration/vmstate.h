@@ -187,32 +187,54 @@ enum VMStateFlags {
 };
 
 typedef struct {
+	/* 字段名字 */
     const char *name;
+	/* 字段在VMState结构体中的偏移 */
     size_t offset;
+	/* 字段长度 */
     size_t size;
     size_t start;
     int num;
     size_t num_offset;
     size_t size_offset;
+	/* 收发该字段使用的函数 */
     const VMStateInfo *info;
+	/* 描述设备状态字段的类型，包括指针，数组，结构体，缓存等等*/
     enum VMStateFlags flags;
+	/* 指向包含的子设备状态，非必须*/
     const VMStateDescription *vmsd;
+	/* 当该字段的版本大于源端设备状态的版本时，不会被传输 */
     int version_id;
     bool (*field_exists)(void *opaque, int version_id);
 } VMStateField;
 
 struct VMStateDescription {
+	/* 设备状态名 */
     const char *name;
     int unmigratable;
+    /* 版本ID，用于解决设备状态增删字段后的传输问题
+     * 只有当源端的VMState版本ID小于等于目的端时
+     * 设备状态信息才能传输成功
+     */
     int version_id;
+    /* 目的端允许源端发送的VMState的最低版本
+     * 如果源端发送的版本小于minimum_version_id 
+     * 目的端报错
+     * */		
     int minimum_version_id;
     int minimum_version_id_old;
     LoadStateHandler *load_state_old;
+	/* 接收VMState前的回调函数，非必须字段 */
     int (*pre_load)(void *opaque);
+	/* 接收VMState后的回调函数，非必须字段 */ 
     int (*post_load)(void *opaque, int version_id);
+	/* 发送VMState前的回调函数，非必须字段 */
     void (*pre_save)(void *opaque);
+	/* 当VMState为subsection时，用于判断哪些字段需要被发送，非必须字段 */
     bool (*needed)(void *opaque);
+	/* 必须发送的VMState的字段*/
     VMStateField *fields;
+	/* 可选的发送字段，发送subsections前需要先执行needed函数判断 */
     const VMStateDescription **subsections;
 };
 

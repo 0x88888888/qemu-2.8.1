@@ -21,7 +21,7 @@ struct vhost_virtqueue {
     unsigned long long used_phys;
     unsigned used_size;
 	/*
-	 * eventfd,在vhost_virtqueue_init中初始化
+	 * eventfd,在vhost_virtqueue_init中调用event_notifier_init初始化
 	 */
     EventNotifier masked_notifier;
 };

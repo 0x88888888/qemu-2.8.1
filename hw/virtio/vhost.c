@@ -1085,8 +1085,8 @@ static int vhost_virtqueue_set_busyloop_timeout(struct vhost_dev *dev,
  *		 net_init_tap()
  *		  net_init_tap_one(model="tap")
  *		   vhost_net_init()
- *			vhost_dev_init()
- *           vhost_virtqueue_init()
+ *			vhost_dev_init(hdev=vhost_net->dev,backend_type==VHOST_BACKEND_TYPE_KERNEL)
+ *           vhost_virtqueue_init() 被循环调用hdev->nvqs次
  */
 static int vhost_virtqueue_init(struct vhost_dev *dev,
                                 struct vhost_virtqueue *vq, int n)
@@ -1130,7 +1130,7 @@ static void vhost_virtqueue_cleanup(struct vhost_virtqueue *vq)
  *		 net_init_tap()
  *		  net_init_tap_one(model="tap")
  *         vhost_net_init()
- *          vhost_dev_init(hdev=vhost_net->dev)
+ *          vhost_dev_init(hdev=vhost_net->dev,backend_type==VHOST_BACKEND_TYPE_KERNEL)
  */
 int vhost_dev_init(struct vhost_dev *hdev, void *opaque,
                    VhostBackendType backend_type, uint32_t busyloop_timeout)
@@ -1144,12 +1144,13 @@ int vhost_dev_init(struct vhost_dev *hdev, void *opaque,
     r = vhost_set_backend_type(hdev, backend_type);
     assert(r >= 0);
 
-    //vhost_kernel_memslots_limit
+    //vhost_kernel_init,设置hdev->opaque= opaque(文件/dev/vhost-net的fd)
     r = hdev->vhost_ops->vhost_backend_init(hdev, opaque);
     if (r < 0) {
         goto fail;
     }
 
+    //vhost_kernel_memslots_limit
     if (used_memslots > hdev->vhost_ops->vhost_backend_memslots_limit(hdev)) {
         error_report("vhost backend memory slots limit is less"
                 " than current number of present memory slots");
@@ -1157,18 +1158,21 @@ int vhost_dev_init(struct vhost_dev *hdev, void *opaque,
         goto fail;
     }
 
+    //vhost_kernel_set_owner,在内核中创建vhost-{d}进程
     r = hdev->vhost_ops->vhost_set_owner(hdev);
     if (r < 0) {
         VHOST_OPS_DEBUG("vhost_set_owner failed");
         goto fail;
     }
 
+    //vhost_kernel_get_features
     r = hdev->vhost_ops->vhost_get_features(hdev, &features);
     if (r < 0) {
         VHOST_OPS_DEBUG("vhost_get_features failed");
         goto fail;
     }
 
+    
     for (i = 0; i < hdev->nvqs; ++i, ++n_initialized_vqs) {
 		 //去内核设置好vhost 的vring
         r = vhost_virtqueue_init(hdev, hdev->vqs + i, hdev->vq_index + i);
@@ -1189,6 +1193,12 @@ int vhost_dev_init(struct vhost_dev *hdev, void *opaque,
 
     hdev->features = features;
 
+    /*
+     * 这个listener的一个主要作用用途是控制热迁移中的脏页记录,
+     * 在不适用vhost的时候,虚拟机访问的内存都能够通过EPT进行脏页标脏处理
+     * 但是在使用vhost-net之后,vring中指示的内存也会被vhost给标脏,因此必须有方法记录这些脏页，
+     * 保证以后在热迁移的时候能够正确使用，所以这里注册了内存变更监听
+     */
     hdev->memory_listener = (MemoryListener) {
         .begin = vhost_begin,
         .commit = vhost_commit,
@@ -1491,10 +1501,16 @@ void vhost_dev_stop(struct vhost_dev *hdev, VirtIODevice *vdev)
     hdev->started = false;
 }
 
+/*
+ * vhost_net_start()
+ *  vhost_net_start_one()
+ *   vhost_net_set_backend()
+ */ 
 int vhost_net_set_backend(struct vhost_dev *hdev,
                           struct vhost_vring_file *file)
 {
     if (hdev->vhost_ops->vhost_net_set_backend) {
+		//vhost_kernel_net_set_backend
         return hdev->vhost_ops->vhost_net_set_backend(hdev, file);
     }
 

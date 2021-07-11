@@ -82,6 +82,8 @@ typedef struct VirtioBusClass {
      * Assigns/deassigns the ioeventfd backing for the transport on
      * the device for queue number n. Returns an error value on
      * failure.
+     *
+     * virtio_mmio_ioeventfd_assign
      */
     int (*ioeventfd_assign)(DeviceState *d, EventNotifier *notifier,
                             int n, bool assign);

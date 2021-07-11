@@ -271,7 +271,13 @@ struct MemoryRegion {
     QTAILQ_ENTRY(MemoryRegion) subregions_link;
     QTAILQ_HEAD(coalesced_ranges, CoalescedMemoryRange) coalesced;
     const char *name;
+	/*
+	 * 表示MR对应的地址区间中有多少个ioeventfd
+	 */
     unsigned ioeventfd_nb;
+	/*
+	 * MR中包含的ioeventfds数组，每注册一个ioeventfd，不只KVM会有记录，QEMU也会有记录
+	 */
     MemoryRegionIoeventfd *ioeventfds;
     QLIST_HEAD(, IOMMUNotifier) iommu_notify;
     IOMMUNotifierFlag iommu_notify_flags;

@@ -104,7 +104,7 @@ struct VirtQueue
 
     /* Notification enabled? 
      *
-     * 是否需要通知驱动端(guest os)
+     * QEMU是否需要通知驱动端(guest os)
      */
     bool notification;
 
@@ -125,6 +125,11 @@ struct VirtQueue
 	 * virtio_queue_notify调用handle_output或者handle_aio_output
 	 *
 	 * qemu收到虚拟机的IO请求时候，会调用handle_output函数
+	 *
+	 * virtio_balloon_handle_output
+	 * virtio_net_handle_tx_timer
+	 * virtio_net_handle_ctrl
+	 * virtio_net_handle_ctrl
 	 */	
     VirtIOHandleOutput handle_output;
 	//与handle_output类似
@@ -591,6 +596,7 @@ int virtqueue_avail_bytes(VirtQueue *vq, unsigned int in_bytes,
     return in_bytes <= in_total && out_bytes <= out_total;
 }
 
+//把guest os在的物理地址map成qemu进程中的虚拟地址
 static bool virtqueue_map_desc(VirtIODevice *vdev, unsigned int *p_num_sg,
                                hwaddr *addr, struct iovec *iov,
                                unsigned int max_num_sg, bool is_write,
@@ -678,6 +684,11 @@ void virtqueue_map(VirtQueueElement *elem)
     virtqueue_map_iovec(elem->out_sg, elem->out_addr, &elem->out_num, 0);
 }
 
+/*
+ * virtio_balloon_handle_output()
+ *  virtqueue_pop()
+ *   virtqueue_alloc_element()
+ */
 static void *virtqueue_alloc_element(size_t sz, unsigned out_num, unsigned in_num)
 {
     VirtQueueElement *elem;
@@ -965,6 +976,12 @@ static int virtio_validate_features(VirtIODevice *vdev)
     }
 }
 
+/*
+ * virtio_pci_common_write(val==15&&0xff)
+ * virtio_ioport_write(val==)
+ * virtio_write_config(val==)
+ *  virtio_set_status(val==15&&0xff)
+ */
 int virtio_set_status(VirtIODevice *vdev, uint8_t val)
 {
     VirtioDeviceClass *k = VIRTIO_DEVICE_GET_CLASS(vdev);
@@ -1360,7 +1377,7 @@ void virtio_queue_notify(VirtIODevice *vdev, int n)
 
     trace_virtio_queue_notify(vdev, vq - vdev->vq, vq);
 	
-    if (vq->handle_aio_output) {
+    if (vq->handle_aio_output) { //用aio框架去处理
         event_notifier_set(&vq->host_notifier);
     } else if (vq->handle_output) { //virtio_balloon_handle_output
         vq->handle_output(vdev, vq);

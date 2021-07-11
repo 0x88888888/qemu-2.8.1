@@ -348,6 +348,10 @@ static int virtio_pci_ioeventfd_assign(DeviceState *d, EventNotifier *notifier,
     return 0;
 }
 
+/*
+ * virtio_pci_start_ioeventfd()
+ *  virtio_pci_start_ioeventfd()
+ */
 static void virtio_pci_start_ioeventfd(VirtIOPCIProxy *proxy)
 {
     virtio_bus_start_ioeventfd(&proxy->bus);
@@ -648,6 +652,7 @@ static void virtio_write_config(PCIDevice *pci_dev, uint32_t address,
 
     if (range_covers_byte(address, len, PCI_COMMAND) &&
         !(pci_dev->config[PCI_COMMAND] & PCI_COMMAND_MASTER)) {
+        
         virtio_pci_stop_ioeventfd(proxy);
         virtio_set_status(vdev, vdev->status & ~VIRTIO_CONFIG_S_DRIVER_OK);
     }
@@ -1324,6 +1329,7 @@ static void virtio_pci_common_write(void *opaque, hwaddr addr,
             virtio_pci_stop_ioeventfd(proxy);
         }
 
+        //启动网卡?val=15
         virtio_set_status(vdev, val & 0xFF);
 
         if (val & VIRTIO_CONFIG_S_DRIVER_OK) {

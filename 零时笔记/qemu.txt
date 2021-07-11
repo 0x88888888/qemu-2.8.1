@@ -94,7 +94,12 @@ qemu-system-x86_64 -m 512\
 gdb --args qemu-system-x86_64 -m 512 -nographic  -kernel arch/x86/boot/bzImage -append "noinintrd console=ttyS0 crashkernel=256M root=/dev/vda rootfstype=ext4 rw loglevel=8" -drive if=none,file=rootfs_debian_x86_64.ext4,id=hd0 -device virtio-blk-pci,drive=hd0 -netdev user,id=mynet -device virtio-net-pci,netdev=mynet --fsdev local,id=kmod_dev,path=./kmodules,security_model=none -device virtio-9p-pci,fsdev=kmod_dev,mount_tag=kmod_mount -device virtio-balloon-pci,id=balloon0
 
 
-qemu-system-x86_64 -m 512 -nographic  -kernel arch/x86/boot/bzImage -append "noinintrd console=ttyS0 crashkernel=256M root=/dev/vda rootfstype=ext4 rw loglevel=8" -drive if=none,file=rootfs_debian_x86_64.ext4,id=hd0 -device virtio-blk-pci,drive=hd0 -netdev user,id=mynet -device virtio-net-pci,netdev=mynet --fsdev local,id=kmod_dev,path=./kmodules,security_model=none -device virtio-9p-pci,fsdev=kmod_dev,mount_tag=kmod_mount -device virtio-balloon-pci,id=balloon0 -s -S
+qemu-system-x86_64 -m 512 -nographic  -kernel arch/x86/boot/bzImage -append "noinintrd console=ttyS0 crashkernel=256M root=/dev/vda rootfstype=ext4 rw loglevel=8" -drive if=none,file=rootfs_debian_x86_64.ext4,id=hd0 -device virtio-blk-pci,drive=hd0 -netdev user,id=mynet -device virtio-net-pci,netdev=mynet --fsdev local,id=kmod_dev,path=./kmodules,security_model=none -device virtio-9p-pci,fsdev=kmod_dev,mount_tag=kmod_mount -device virtio-balloon-pci,id=balloon0
 
+
+vhost
+gdb --args qemu-system-x86_64 -m 512 -nographic -enable-kvm -cpu kvm64 -s -S  -kernel arch/x86/boot/bzImage -append "noinintrd console=ttyS0 crashkernel=256M root=/dev/vda rootfstype=ext4 rw loglevel=8" -drive if=none,file=rootfs_debian_x86_64.ext4,id=hd0 -device virtio-blk-pci,drive=hd0 -netdev tap,vhost=on,id=mynet -device virtio-net-pci,netdev=mynet --fsdev local,id=kmod_dev,path=./kmodules,security_model=none -device virtio-9p-pci,fsdev=kmod_dev,mount_tag=kmod_mount -device virtio-balloon-pci,id=balloon0
+
+device_add virtio-rng-pci,id=id2
 
 

@@ -33,6 +33,9 @@ void event_notifier_init_fd(EventNotifier *e, int fd)
 }
 #endif
 
+/* 
+ * 调用eventfd初始化一个EventNotifier出来
+ */
 int event_notifier_init(EventNotifier *e, int active)
 {
     int fds[2];

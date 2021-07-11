@@ -895,6 +895,7 @@ int rom_add_file(const char *file, const char *fw_dir,
 
     rom = g_malloc0(sizeof(*rom));
     rom->name = g_strdup(file);
+	//在qemu的安装目录下面查找rom->name
     rom->path = qemu_find_file(QEMU_FILE_TYPE_BIOS, rom->name);
     rom->as = as;
     if (rom->path == NULL) {
@@ -930,6 +931,7 @@ int rom_add_file(const char *file, const char *fw_dir,
         goto err;
     }
     close(fd);
+	//链接到roms链表上去
     rom_insert(rom);
     if (rom->fw_file && fw_cfg) {
         const char *basename;
@@ -961,7 +963,7 @@ int rom_add_file(const char *file, const char *fw_dir,
             snprintf(devpath, sizeof(devpath), "/rom@" TARGET_FMT_plx, addr);
         }
     }
-
+    //添加到启动项
     add_boot_device_path(bootindex, NULL, devpath);
     return 0;
 

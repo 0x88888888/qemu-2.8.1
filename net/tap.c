@@ -56,7 +56,7 @@ typedef struct TAPState {
     bool using_vnet_hdr;
     bool has_ufo;
     bool enabled;
-	//与内核的vhost-net联系
+	//与内核的vhost-net联系,如果启用vhost方式,virtio就不会走到qemu层面的了，直接在内核解决数据VM与host的数据传输了
     VHostNetState *vhost_net;
     unsigned host_vnet_hdr_len;
     Notifier exit;
@@ -781,6 +781,7 @@ static void net_init_tap_one(const NetdevTapOptions *tap, NetClientState *peer,
     //要在使用vhost accelerator,代替qemu用户空间处理vring数据
     if (tap->has_vhost ? tap->vhost :
         vhostfdname || (tap->has_vhostforce && tap->vhostforce)) {
+			
         VhostNetOptions options;
 
         //virtio 的后端在内核了，不在qemu层面了
@@ -853,7 +854,7 @@ static int get_fds(char *str, char *fds[], int max)
  *   net_init_netdev() 处理 -netdev 参数
  *    net_client_init()
  *     net_client_init1()
- *       net_init_tap()
+ *       net_init_tap(peer==NULL) //-netdev 参数
  */
 int net_init_tap(const Netdev *netdev, const char *name,
                  NetClientState *peer, Error **errp)

@@ -78,6 +78,10 @@ typedef struct NetClientInfo {
     NetReceiveIOV *receive_iov;
     NetCanReceive *can_receive;
     NetCleanup *cleanup;
+	/*
+	 * virtio_net_set_link_status,
+	 * e1000_set_link_status
+	 */
     LinkStatusChanged *link_status_changed;
     QueryRxFilter *query_rx_filter;
     NetPoll *poll;

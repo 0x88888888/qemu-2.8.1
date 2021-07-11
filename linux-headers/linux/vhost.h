@@ -83,9 +83,14 @@ struct vhost_memory_region {
 /* All region addresses and sizes must be 4K aligned. */
 #define VHOST_PAGE_SIZE 0x1000
 
+/*
+ * 
+ * 
+ */
 struct vhost_memory {
 	__u32 nregions;
 	__u32 padding;
+	// 保存vm 物理地址与qemu虚拟地址的关系
 	struct vhost_memory_region regions[0];
 };
 

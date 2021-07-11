@@ -8,10 +8,13 @@ struct vhost_net;
 typedef struct vhost_net VHostNetState;
 
 typedef struct VhostNetOptions {
+	/* 
+	 * 使用KENNEL_VHOST时,为VHOST_BACKEND_TYPE_KERNEL
+	 */
     VhostBackendType backend_type;
     NetClientState *net_backend;
     uint32_t busyloop_timeout;
-    void *opaque;//保存/dev/vhost-net,这个设备文件就是内核代码的vhost_net_misc对象
+    void *opaque;//保存/dev/vhost-net文件的fd,这个设备文件就是内核代码的vhost_net_misc对象
 } VhostNetOptions;
 
 uint64_t vhost_net_get_max_queues(VHostNetState *net);

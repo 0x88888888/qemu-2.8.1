@@ -153,7 +153,10 @@ static void virtio_net_vhost_status(VirtIONet *n, uint8_t status)
         for (i = 0;  i < queues; i++) {
             NetClientState *qnc = qemu_get_subqueue(n->nic, i);
 
-            /* Purge both directions: TX and RX. */
+            /* Purge both directions: TX and RX. 
+             *
+             * 将包丢弃掉
+		     */
             qemu_net_queue_purge(qnc->peer->incoming_queue, qnc);
             qemu_net_queue_purge(qnc->incoming_queue, qnc->peer);
         }
@@ -167,6 +170,7 @@ static void virtio_net_vhost_status(VirtIONet *n, uint8_t status)
             n->vhost_started = 0;
         }
     } else {
+    
         vhost_net_stop(vdev, n->nic->ncs, queues);
         n->vhost_started = 0;
     }
@@ -228,6 +232,10 @@ static void virtio_net_vnet_endian_status(VirtIONet *n, uint8_t status)
 /*
  * virtio_net_set_link_status()
  *  virtio_net_set_status()
+ *
+ * virtio_write_config()
+ *  virtio_set_status()
+ *   virtio_net_set_status(val==15&&0xff)
  */
 static void virtio_net_set_status(struct VirtIODevice *vdev, uint8_t status)
 {
@@ -250,10 +258,11 @@ static void virtio_net_set_status(struct VirtIODevice *vdev, uint8_t status)
         } else {
             queue_status = status;
         }
+		//是否已经处于启动状态
         queue_started =
             virtio_net_started(n, queue_status) && !n->vhost_started;
 
-        if (queue_started) {
+        if (queue_started) {//如果已经处于启动状态,先把处理掉
             qemu_flush_queued_packets(ncs);
         }
 

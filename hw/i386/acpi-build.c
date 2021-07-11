@@ -2610,6 +2610,7 @@ build_dmar_q35(GArray *table_data, BIOSLinker *linker)
         dmar_flags |= 0x1;      /* Flags: 0x1: INT_REMAP */
     }
 
+    //给acpi table加上AcpiTableDmar要的长度
     dmar = acpi_data_push(table_data, sizeof(*dmar));
     dmar->host_address_width = VTD_HOST_ADDRESS_WIDTH - 1;
     dmar->flags = dmar_flags;
