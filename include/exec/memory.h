@@ -487,6 +487,8 @@ void memory_region_unref(MemoryRegion *mr);
  * @opaque: passed to the read and write callbacks of the @ops structure.
  * @name: used for debugging; not visible to the user or ABI
  * @size: size of the region.
+ *
+ *
  */
 void memory_region_init_io(MemoryRegion *mr,
                            struct Object *owner,
